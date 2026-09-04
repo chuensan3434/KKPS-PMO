@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { EffortEstimation } from "@/features/planning/components/effort-estimation";
-import { ScenarioControls } from "@/features/planning/components/scenario-controls";
 import { defaultPlanningState } from "@/features/planning/planning-data";
 import { getCapacityState, getOverCapacityCells, getPlanningSummary, getProjectAllocation, getProjectsForSquadSprint } from "@/features/planning/decision-utils";
 import { defaultEstimationState } from "@/features/planning/estimation-data";
@@ -10,9 +9,7 @@ import { calculateProjectEstimation, integrateEstimation } from "@/features/plan
 import { loadEstimationState, saveEstimationState } from "@/features/planning/estimation-storage";
 import { loadPlanningState, savePlanningState } from "@/features/planning/planning-storage";
 import { formatSprintRange, generateSprints, remainingCapacity, validateSprintStart } from "@/features/planning/planning-utils";
-import { loadScenarioState, saveScenarioState } from "@/features/planning/scenario-storage";
-import { applyScenarioSchedules, deleteScenario, duplicateScenario, getActiveScenario, normalizeScenarioState, promoteScenarioToBaseline, renameScenario, updateScenarioSchedules } from "@/features/planning/scenario-utils";
-import type { EstimationState, PlanningProject, PlanningScenarioState, PlanningState } from "@/features/planning/types";
+import type { EstimationState, PlanningProject, PlanningState } from "@/features/planning/types";
 
 const sprintWidth = 112;
 const defaultDuration = 2;
@@ -42,16 +39,13 @@ export default function PlanningPage() {
   const [businessUnitFilter, setBusinessUnitFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [inspectedCell, setInspectedCell] = useState<{ squadId: string; sprint: number } | null>(null);
-  const [scenarioState, setScenarioState] = useState<PlanningScenarioState>(() => normalizeScenarioState(null, defaultPlanningState));
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const loaded = loadPlanningState();
       const loadedEstimation = loadEstimationState(loaded.projects);
-      const loadedScenarios = loadScenarioState(loaded);
-      setState(integrateEstimation(applyScenarioSchedules(loaded, getActiveScenario(loadedScenarios)), loadedEstimation));
+      setState(integrateEstimation(loaded, loadedEstimation));
       setEstimation(loadedEstimation);
-      setScenarioState(loadedScenarios);
       setDraftYear(loaded.year);
       setDraftStart(loaded.sprintOneStart);
       setReady(true);
@@ -60,25 +54,18 @@ export default function PlanningPage() {
   }, []);
   useEffect(() => {
     if (!ready) return;
-    const baseline = scenarioState.scenarios.find((scenario) => scenario.type === "baseline");
-    try { savePlanningState(baseline ? applyScenarioSchedules(state, baseline) : state); }
+    try { savePlanningState(state); }
     catch { window.setTimeout(() => setSaveError("Planning changes could not be saved in this browser."), 0); }
-  }, [state, scenarioState, ready]);
+  }, [state, ready]);
   useEffect(() => {
     if (!ready) return;
     try { saveEstimationState(estimation); }
     catch { window.setTimeout(() => setSaveError("Estimation changes could not be saved in this browser."), 0); }
   }, [estimation, ready]);
-  useEffect(() => {
-    if (!ready) return;
-    try { saveScenarioState(scenarioState); }
-    catch { window.setTimeout(() => setSaveError("Scenario changes could not be saved in this browser."), 0); }
-  }, [scenarioState, ready]);
 
   const sprints = useMemo(() => generateSprints(state.year, state.sprintOneStart), [state.year, state.sprintOneStart]);
   const capacity = useMemo(() => remainingCapacity(state.projects, state.squads, sprints.length), [state.projects, state.squads, sprints.length]);
   const summaries = useMemo(() => new Map(estimation.projects.map((detail) => [detail.projectId, calculateProjectEstimation(detail.projectId, detail.requirements, state.squads)])), [estimation, state.squads]);
-  const readyProjectIds = useMemo(() => new Set([...summaries].filter(([, summary]) => summary.readyForPlanning).map(([id]) => id)), [summaries]);
   const backlog = state.projects.filter((p) => p.status === "unscheduled" && summaries.get(p.id)?.readyForPlanning);
   const scheduled = state.projects.filter((p) => p.status === "scheduled");
   const selected = state.projects.find((p) => p.id === selectedId) ?? null;
@@ -93,18 +80,13 @@ export default function PlanningPage() {
   const inspectedSquad = inspectedCell ? state.squads.find((squad) => squad.id === inspectedCell.squadId) : null;
   const inspectedProjects = inspectedCell ? getProjectsForSquadSprint(state.projects, inspectedCell.squadId, inspectedCell.sprint) : [];
 
-  function updateProject(id: string, update: Partial<PlanningProject>) { const projects = state.projects.map((project) => project.id === id ? { ...project, ...update } : project); setState({ ...state, projects }); setScenarioState((current) => updateScenarioSchedules(current, current.activeScenarioId, projects)); }
+  function updateProject(id: string, update: Partial<PlanningProject>) { setState((current) => ({ ...current, projects: current.projects.map((p) => p.id === id ? { ...p, ...update } : p) })); }
   function schedule(id: string, start: number) { updateProject(id, { status: "scheduled", scheduledStartSprint: start, scheduledEndSprint: Math.min(sprints.length, start + defaultDuration - 1) }); setSelectedId(id); }
   function unschedule(id: string) { updateProject(id, { status: "unscheduled", scheduledStartSprint: null, scheduledEndSprint: null }); setSelectedId(null); }
   function draggedId(event: React.DragEvent) { return event.dataTransfer.getData("text/project-id"); }
-  function generate() { const error = validateSprintStart(draftStart, draftYear); setDateError(error); if (!error) { const projects = state.projects.map((project) => ({ ...project, status: "unscheduled" as const, scheduledStartSprint: null, scheduledEndSprint: null })); setState({ ...state, year: draftYear, sprintOneStart: draftStart, projects }); setScenarioState((current) => ({ ...current, scenarios: current.scenarios.map((scenario) => ({ ...scenario, projectSchedules: Object.fromEntries(projects.map((project) => [project.id, { projectId: project.id, status: "unscheduled", startSprint: null, endSprint: null }])) })) })); } }
+  function generate() { const error = validateSprintStart(draftStart, draftYear); setDateError(error); if (!error) setState((current) => ({ ...current, year: draftYear, sprintOneStart: draftStart, projects: current.projects.map((p) => ({ ...p, status: "unscheduled", scheduledStartSprint: null, scheduledEndSprint: null })) })); }
   function changeEstimation(next: EstimationState) { setEstimation(next); setState((current) => integrateEstimation(current, next)); }
   function changeFilter(setter: (value: string) => void, value: string) { setter(value); setSelectedId(null); }
-  function switchScenario(id: string) { const scenario = scenarioState.scenarios.find((item) => item.id === id); if (!scenario) return; setScenarioState({ ...scenarioState, activeScenarioId: id }); setState((current) => applyScenarioSchedules(current, scenario)); setSelectedId(null); setInspectedCell(null); }
-  function duplicateActiveScenario() { const next = duplicateScenario(scenarioState, scenarioState.activeScenarioId); setScenarioState(next); setState((current) => applyScenarioSchedules(current, getActiveScenario(next))); setSelectedId(null); }
-  function renameActiveScenario(name: string) { const next = renameScenario(scenarioState, scenarioState.activeScenarioId, name); if (!next) return false; setScenarioState(next); return true; }
-  function deleteActiveScenario() { const next = deleteScenario(scenarioState, scenarioState.activeScenarioId); setScenarioState(next); setState((current) => applyScenarioSchedules(current, getActiveScenario(next))); setSelectedId(null); }
-  function promoteActiveScenario() { setScenarioState(promoteScenarioToBaseline(scenarioState, scenarioState.activeScenarioId)); }
 
   if (!ready) return <div className="px-4 py-12 text-sm text-slate-500 sm:px-6 lg:px-8">Loading planning workspace…</div>;
 
@@ -118,8 +100,6 @@ export default function PlanningPage() {
     {saveError && <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{saveError}</div>}
     {view === "estimation" ? <EffortEstimation projects={state.projects} squads={state.squads} estimation={estimation} selectedProjectId={estimationProjectId} onSelectProject={setEstimationProjectId} onChange={changeEstimation} /> : <>
     <section aria-labelledby="configuration" className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-end gap-4"><div><h2 id="configuration" className="text-base font-semibold text-slate-950">Planning configuration</h2><p className="mt-1 text-sm text-slate-500">Each sprint is two working weeks (10 weekdays).</p></div><label className="ml-0 text-sm font-medium text-slate-700 sm:ml-auto">Planning year<input type="number" min="2020" max="2100" value={draftYear} onChange={(e) => setDraftYear(Number(e.target.value))} className="mt-1 block h-10 w-28 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /></label><label className="text-sm font-medium text-slate-700">Sprint 1 start (Monday)<input type="date" value={draftStart} onChange={(e) => setDraftStart(e.target.value)} aria-invalid={Boolean(dateError)} className="mt-1 block h-10 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /></label><button onClick={generate} className="h-10 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Generate / refresh</button></div>{dateError && <p role="alert" className="mt-3 text-sm font-medium text-red-700">{dateError}</p>}</section>
-
-    <ScenarioControls scenarioState={scenarioState} planning={state} readyProjectIds={readyProjectIds} sprintCount={sprints.length} onSwitch={switchScenario} onDuplicate={duplicateActiveScenario} onRename={renameActiveScenario} onDelete={deleteActiveScenario} onPromote={promoteActiveScenario} />
 
     <section aria-label="Planning decision summary" className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">{[
       ["Scheduled projects", planningSummary.scheduledProjects], ["Backlog projects", planningSummary.backlogProjects], ["Planned effort", `${Number(planningSummary.plannedMd.toFixed(1)).toLocaleString()} MD`], ["Overloaded cells", planningSummary.overloadedCells], ["Squads overloaded", planningSummary.overloadedSquads],

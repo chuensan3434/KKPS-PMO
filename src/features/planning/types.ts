@@ -65,25 +65,3 @@ export type ProjectEstimationSummary = {
   squadEffort: SquadEffort[];
   readyForPlanning: boolean;
 };
-
-export type ProjectSchedule = {
-  projectId: string;
-  status: "scheduled" | "unscheduled";
-  startSprint: number | null;
-  endSprint: number | null;
-};
-
-export type PlanningScenario = {
-  id: string;
-  name: string;
-  type: "baseline" | "scenario";
-  createdAt: string;
-  updatedAt: string;
-  projectSchedules: Record<string, ProjectSchedule>;
-};
-
-export type PlanningScenarioState = {
-  version: 1;
-  activeScenarioId: string;
-  scenarios: PlanningScenario[];
-};
