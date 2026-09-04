@@ -11,6 +11,23 @@ const requiredHeaders = [
   "Comments",
 ] as const;
 
+const confirmedSquads = [
+  "Vanilla",
+  "Butterbeer",
+  "Matcha",
+  "Latte",
+  "Piccolo",
+  "Rocky Road",
+  "Ka-ti",
+  "Mocha",
+  "Americano",
+  "Magnum",
+] as const;
+
+const confirmedSquadByNormalizedName = new Map(
+  confirmedSquads.map((squad) => [squad.toLocaleLowerCase("en-US"), squad]),
+);
+
 export type ParseResult = {
   entries: WorkEntry[];
   skippedEntryRows: number;
@@ -93,20 +110,43 @@ function parseHours(value: string): number | null {
   return Number.isFinite(hours) && hours >= 0 ? hours : null;
 }
 
-function deriveUser(value: string) {
+export function parseWorkforceIdentity(value: string) {
   const separator = value.indexOf(",");
   if (separator === -1) {
-    return { role: "Unspecified", personName: value };
+    return { sourceGroup: value, person: value, squad: null, role: value };
   }
 
-  const role = value.slice(0, separator).trim();
-  const personName = value.slice(separator + 1).trim();
+  const sourceGroup = value.slice(0, separator).trim();
+  const person = value.slice(separator + 1).trim();
 
-  if (!role || !personName) {
-    return { role: "Unspecified", personName: value };
+  if (!sourceGroup || !person) {
+    const preservedValue = value.trim();
+    return {
+      sourceGroup: sourceGroup || preservedValue,
+      person: person || preservedValue,
+      squad: null,
+      role: sourceGroup || preservedValue,
+    };
   }
 
-  return { role, personName };
+  const canonicalSquad = confirmedSquadByNormalizedName.get(
+    sourceGroup.toLocaleLowerCase("en-US"),
+  );
+  if (canonicalSquad) {
+    return { sourceGroup, person, squad: canonicalSquad, role: "Dev" };
+  }
+
+  const possibleSquad = sourceGroup.replace(/\s+qa$/i, "").trim();
+  const canonicalQaSquad =
+    possibleSquad === sourceGroup
+      ? undefined
+      : confirmedSquadByNormalizedName.get(possibleSquad.toLocaleLowerCase("en-US"));
+
+  if (canonicalQaSquad) {
+    return { sourceGroup, person, squad: canonicalQaSquad, role: "QA" };
+  }
+
+  return { sourceGroup, person, squad: null, role: sourceGroup };
 }
 
 export function parseActitimeCsv(source: string): ParseResult {
@@ -115,7 +155,11 @@ export function parseActitimeCsv(source: string): ParseResult {
   }
 
   const rows = parseCsvRows(source.replace(/^\uFEFF/, ""));
-  const header = rows[0]?.map((value) => value.trim());
+  const headerIndex = rows.findIndex((row) => {
+    const values = row.map((value) => value.trim());
+    return requiredHeaders.every((name) => values.includes(name));
+  });
+  const header = headerIndex >= 0 ? rows[headerIndex].map((value) => value.trim()) : null;
 
   if (!header || requiredHeaders.some((name) => !header.includes(name))) {
     throw new Error(`The CSV must include these columns: ${requiredHeaders.join(", ")}.`);
@@ -127,7 +171,7 @@ export function parseActitimeCsv(source: string): ParseResult {
   let project = "";
   let skippedEntryRows = 0;
 
-  for (const rawRow of rows.slice(1)) {
+  for (const rawRow of rows.slice(headerIndex + 1)) {
     const get = (name: (typeof requiredHeaders)[number]) =>
       (rawRow[column[name]] ?? "").trim();
     const rowCustomer = get("Customer");
@@ -159,7 +203,7 @@ export function parseActitimeCsv(source: string): ParseResult {
       continue;
     }
 
-    const { role, personName } = deriveUser(user);
+    const identity = parseWorkforceIdentity(user);
     entries.push({
       customer,
       project,
@@ -167,8 +211,7 @@ export function parseActitimeCsv(source: string): ParseResult {
       typeOfWork,
       date,
       user,
-      role,
-      personName,
+      ...identity,
       hours,
       comments: get("Comments"),
     });

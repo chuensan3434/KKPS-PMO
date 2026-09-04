@@ -34,7 +34,7 @@ function SummaryList({ title, items }: Readonly<{ title: string; items: SummaryI
 type FilterSelectProps = {
   label: string;
   value: string;
-  options: string[];
+  options: Array<string | { label: string; value: string }>;
   onChange: (value: string) => void;
 };
 
@@ -48,9 +48,10 @@ function FilterSelect({ label, value, options, onChange }: Readonly<FilterSelect
         className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
       >
         <option value="">All {label.toLowerCase()}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
+        {options.map((option) => {
+          const item = typeof option === "string" ? { label: option, value: option } : option;
+          return <option key={item.value} value={item.value}>{item.label}</option>;
+        })}
       </select>
     </label>
   );
@@ -71,7 +72,12 @@ export function WorkSummaryDashboard() {
   const options = useMemo(
     () => ({
       roles: uniqueOptions(entries, (entry) => entry.role),
-      people: uniqueOptions(entries, (entry) => entry.personName),
+      sourceGroups: uniqueOptions(entries, (entry) => entry.sourceGroup),
+      squads: uniqueOptions(
+        entries.filter((entry) => entry.squad !== null),
+        (entry) => entry.squad ?? "",
+      ),
+      people: uniqueOptions(entries, (entry) => entry.person),
       projects: uniqueOptions(entries, (entry) => entry.project),
     }),
     [entries],
@@ -171,7 +177,7 @@ export function WorkSummaryDashboard() {
               </button>
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <label className="grid gap-2 text-sm font-medium text-slate-700">
                 Date from
                 <input
@@ -195,6 +201,13 @@ export function WorkSummaryDashboard() {
                 />
               </label>
               <FilterSelect label="Role" value={filters.role} options={options.roles} onChange={(value) => updateFilter("role", value)} />
+              <FilterSelect label="Source group" value={filters.sourceGroup} options={options.sourceGroups} onChange={(value) => updateFilter("sourceGroup", value)} />
+              <FilterSelect
+                label="Squad"
+                value={filters.squad}
+                options={[...options.squads, { label: "No squad", value: "__NO_SQUAD__" }]}
+                onChange={(value) => updateFilter("squad", value)}
+              />
               <FilterSelect label="Person" value={filters.person} options={options.people} onChange={(value) => updateFilter("person", value)} />
               <FilterSelect label="Project" value={filters.project} options={options.projects} onChange={(value) => updateFilter("project", value)} />
             </div>
@@ -206,8 +219,10 @@ export function WorkSummaryDashboard() {
             {skippedRows ? <p className="mt-3 text-sm text-blue-100">{skippedRows} incomplete or invalid rows were skipped.</p> : null}
           </section>
 
-          <div className="grid items-start gap-6 lg:grid-cols-3">
+          <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
             <SummaryList title="Hours by role" items={summary.byRole} />
+            <SummaryList title="Hours by source group" items={summary.bySourceGroup} />
+            <SummaryList title="Hours by squad" items={summary.bySquad} />
             <SummaryList title="Hours by person" items={summary.byPerson} />
             <SummaryList title="Hours by project" items={summary.byProject} />
           </div>

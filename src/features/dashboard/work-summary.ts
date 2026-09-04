@@ -4,6 +4,8 @@ export const emptyFilters: WorkFilters = {
   dateFrom: "",
   dateTo: "",
   role: "",
+  sourceGroup: "",
+  squad: "",
   person: "",
   project: "",
 };
@@ -14,7 +16,10 @@ export function filterWorkEntries(entries: WorkEntry[], filters: WorkFilters) {
       (!filters.dateFrom || entry.date >= filters.dateFrom) &&
       (!filters.dateTo || entry.date <= filters.dateTo) &&
       (!filters.role || entry.role === filters.role) &&
-      (!filters.person || entry.personName === filters.person) &&
+      (!filters.sourceGroup || entry.sourceGroup === filters.sourceGroup) &&
+      (!filters.squad ||
+        (filters.squad === "__NO_SQUAD__" ? entry.squad === null : entry.squad === filters.squad)) &&
+      (!filters.person || entry.person === filters.person) &&
       (!filters.project || entry.project === filters.project),
   );
 }
@@ -36,7 +41,12 @@ export function summarizeWork(entries: WorkEntry[]): WorkSummary {
   return {
     totalHours: entries.reduce((total, entry) => total + entry.hours, 0),
     byRole: groupHours(entries, (entry) => entry.role),
-    byPerson: groupHours(entries, (entry) => entry.personName),
+    bySourceGroup: groupHours(entries, (entry) => entry.sourceGroup),
+    bySquad: groupHours(
+      entries.filter((entry) => entry.squad !== null),
+      (entry) => entry.squad ?? "",
+    ),
+    byPerson: groupHours(entries, (entry) => entry.person),
     byProject: groupHours(entries, (entry) => entry.project),
   };
 }
