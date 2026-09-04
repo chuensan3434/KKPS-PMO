@@ -1,9 +1,10 @@
 type PageContainerProps = {
   title: string;
   description: string;
+  children?: React.ReactNode;
 };
 
-export function PageContainer({ title, description }: Readonly<PageContainerProps>) {
+export function PageContainer({ title, description, children }: Readonly<PageContainerProps>) {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
       <header className="border-b border-slate-200 pb-6">
@@ -12,9 +13,11 @@ export function PageContainer({ title, description }: Readonly<PageContainerProp
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">{description}</p>
       </header>
 
-      <section aria-label={`${title} content`} className="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-6 sm:p-8">
-        <p className="text-sm leading-6 text-slate-500">This area is ready for future implementation.</p>
-      </section>
+      {children ?? (
+        <section aria-label={`${title} content`} className="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-6 sm:p-8">
+          <p className="text-sm leading-6 text-slate-500">This area is ready for future implementation.</p>
+        </section>
+      )}
     </div>
   );
 }
