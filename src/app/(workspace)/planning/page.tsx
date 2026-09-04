@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { EffortEstimation } from "@/features/planning/components/effort-estimation";
 import { defaultPlanningState } from "@/features/planning/planning-data";
+import { defaultEstimationState } from "@/features/planning/estimation-data";
+import { calculateProjectEstimation, integrateEstimation } from "@/features/planning/estimation-utils";
+import { loadEstimationState, saveEstimationState } from "@/features/planning/estimation-storage";
 import { loadPlanningState, savePlanningState } from "@/features/planning/planning-storage";
 import { formatSprintRange, generateSprints, remainingCapacity, validateSprintStart } from "@/features/planning/planning-utils";
-import type { PlanningProject, PlanningState } from "@/features/planning/types";
+import type { EstimationState, PlanningProject, PlanningState } from "@/features/planning/types";
 
 const sprintWidth = 112;
 const defaultDuration = 2;
@@ -27,9 +31,20 @@ export default function PlanningPage() {
   const [dateError, setDateError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<"roadmap" | "estimation">("roadmap");
+  const [estimation, setEstimation] = useState<EstimationState>(defaultEstimationState);
+  const [estimationProjectId, setEstimationProjectId] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => { const loaded = loadPlanningState(); setState(loaded); setDraftYear(loaded.year); setDraftStart(loaded.sprintOneStart); setReady(true); }, 0);
+    const timer = window.setTimeout(() => {
+      const loaded = loadPlanningState();
+      const loadedEstimation = loadEstimationState(loaded.projects);
+      setState(integrateEstimation(loaded, loadedEstimation));
+      setEstimation(loadedEstimation);
+      setDraftYear(loaded.year);
+      setDraftStart(loaded.sprintOneStart);
+      setReady(true);
+    }, 0);
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => {
@@ -37,10 +52,16 @@ export default function PlanningPage() {
     try { savePlanningState(state); }
     catch { window.setTimeout(() => setSaveError("Planning changes could not be saved in this browser."), 0); }
   }, [state, ready]);
+  useEffect(() => {
+    if (!ready) return;
+    try { saveEstimationState(estimation); }
+    catch { window.setTimeout(() => setSaveError("Estimation changes could not be saved in this browser."), 0); }
+  }, [estimation, ready]);
 
   const sprints = useMemo(() => generateSprints(state.year, state.sprintOneStart), [state.year, state.sprintOneStart]);
   const capacity = useMemo(() => remainingCapacity(state.projects, state.squads, sprints.length), [state.projects, state.squads, sprints.length]);
-  const backlog = state.projects.filter((p) => p.status === "unscheduled");
+  const summaries = useMemo(() => new Map(estimation.projects.map((detail) => [detail.projectId, calculateProjectEstimation(detail.projectId, detail.requirements, state.squads)])), [estimation, state.squads]);
+  const backlog = state.projects.filter((p) => p.status === "unscheduled" && summaries.get(p.id)?.readyForPlanning);
   const scheduled = state.projects.filter((p) => p.status === "scheduled");
   const selected = state.projects.find((p) => p.id === selectedId) ?? null;
 
@@ -49,13 +70,19 @@ export default function PlanningPage() {
   function unschedule(id: string) { updateProject(id, { status: "unscheduled", scheduledStartSprint: null, scheduledEndSprint: null }); setSelectedId(null); }
   function draggedId(event: React.DragEvent) { return event.dataTransfer.getData("text/project-id"); }
   function generate() { const error = validateSprintStart(draftStart, draftYear); setDateError(error); if (!error) setState((current) => ({ ...current, year: draftYear, sprintOneStart: draftStart, projects: current.projects.map((p) => ({ ...p, status: "unscheduled", scheduledStartSprint: null, scheduledEndSprint: null })) })); }
+  function changeEstimation(next: EstimationState) { setEstimation(next); setState((current) => integrateEstimation(current, next)); }
 
   if (!ready) return <div className="px-4 py-12 text-sm text-slate-500 sm:px-6 lg:px-8">Loading planning workspace…</div>;
 
   return <div className="w-full px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
     <header className="border-b border-slate-200 pb-6"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">KKPS PMO</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Roadmap Planning</h1><p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">Plan projects across annual sprints and monitor remaining squad capacity in man-days.</p></header>
 
+    <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm" aria-label="Planning view">
+      <button onClick={() => setView("roadmap")} aria-pressed={view === "roadmap"} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === "roadmap" ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Roadmap</button>
+      <button onClick={() => setView("estimation")} aria-pressed={view === "estimation"} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === "estimation" ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Effort Estimation</button>
+    </div>
     {saveError && <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{saveError}</div>}
+    {view === "estimation" ? <EffortEstimation projects={state.projects} squads={state.squads} estimation={estimation} selectedProjectId={estimationProjectId} onSelectProject={setEstimationProjectId} onChange={changeEstimation} /> : <>
     <section aria-labelledby="configuration" className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-end gap-4"><div><h2 id="configuration" className="text-base font-semibold text-slate-950">Planning configuration</h2><p className="mt-1 text-sm text-slate-500">Each sprint is two working weeks (10 weekdays).</p></div><label className="ml-0 text-sm font-medium text-slate-700 sm:ml-auto">Planning year<input type="number" min="2020" max="2100" value={draftYear} onChange={(e) => setDraftYear(Number(e.target.value))} className="mt-1 block h-10 w-28 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /></label><label className="text-sm font-medium text-slate-700">Sprint 1 start (Monday)<input type="date" value={draftStart} onChange={(e) => setDraftStart(e.target.value)} aria-invalid={Boolean(dateError)} className="mt-1 block h-10 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /></label><button onClick={generate} className="h-10 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Generate / refresh</button></div>{dateError && <p role="alert" className="mt-3 text-sm font-medium text-red-700">{dateError}</p>}</section>
 
     <div className="mt-6 grid items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -64,8 +91,9 @@ export default function PlanningPage() {
       <section className="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-200 p-4"><div><h2 className="font-semibold text-slate-950">Annual sprint timeline</h2><p className="mt-1 text-xs text-slate-500">Drag bars between sprints. New projects use a 2-sprint default.</p></div><span className="text-xs font-medium text-slate-500">{sprints.length} sprints</span></div><div className="overflow-x-auto"><div className="relative" style={{ minWidth: sprints.length * sprintWidth }}><div className="flex border-b border-slate-200">{sprints.map((sprint) => <div key={sprint.number} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { const id = draggedId(e); if (id) schedule(id, sprint.number); }} className="shrink-0 border-r border-slate-200 px-2 py-3 text-center" style={{ width: sprintWidth }}><p className="text-xs font-bold text-slate-800">S{sprint.number}</p><p className="mt-1 text-[11px] text-slate-500">{formatSprintRange(sprint)}</p></div>)}</div><div className="relative min-h-44 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px)] bg-[length:112px_100%] p-3">{scheduled.length === 0 && <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">Drop a backlog project onto a sprint to begin.</div>}{scheduled.map((project, index) => { const start = project.scheduledStartSprint ?? 1; const end = project.scheduledEndSprint ?? start; return <button key={project.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/project-id", project.id); e.dataTransfer.effectAllowed = "move"; }} onClick={() => setSelectedId(project.id)} style={{ left: (start - 1) * sprintWidth + 8, top: index * 58 + 14, width: (end - start + 1) * sprintWidth - 16 }} className={`absolute h-11 cursor-grab overflow-hidden rounded-lg border px-3 text-left shadow-sm active:cursor-grabbing ${selectedId === project.id ? "border-blue-700 bg-blue-700 text-white ring-2 ring-blue-200" : "border-blue-300 bg-blue-50 text-blue-950"}`}><span className="block truncate text-xs font-semibold">{project.name} · {project.totalEffortMd} MD</span><span className={`block truncate text-[11px] ${selectedId === project.id ? "text-blue-100" : "text-blue-700"}`}>{project.squadEffort.slice(0, 2).map((s) => s.squadName.replace("Squad ", "")).join(" • ")}{project.squadEffort.length > 2 ? ` • +${project.squadEffort.length - 2}` : ""}</span></button>; })}</div></div></div></section>
     </div>
 
-    {selected && selected.status === "scheduled" && <section className="mt-6 rounded-xl border border-blue-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Selected project</p><h2 className="mt-1 text-lg font-semibold text-slate-950">{selected.name}</h2><p className="text-sm text-slate-500">{selected.businessUnit} · {selected.totalEffortMd} MD total</p></div><button onClick={() => unschedule(selected.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Return to backlog</button></div><div className="mt-4 flex flex-wrap gap-3"><label className="text-sm font-medium text-slate-700">Start sprint<select value={selected.scheduledStartSprint ?? 1} onChange={(e) => { const start = Number(e.target.value); updateProject(selected.id, { scheduledStartSprint: start, scheduledEndSprint: Math.max(start, selected.scheduledEndSprint ?? start) }); }} className="ml-2 rounded-lg border border-slate-300 px-2 py-1.5">{sprints.map((s) => <option key={s.number} value={s.number}>S{s.number}</option>)}</select></label><label className="text-sm font-medium text-slate-700">End sprint<select value={selected.scheduledEndSprint ?? 1} onChange={(e) => updateProject(selected.id, { scheduledEndSprint: Number(e.target.value) })} className="ml-2 rounded-lg border border-slate-300 px-2 py-1.5">{sprints.filter((s) => s.number >= (selected.scheduledStartSprint ?? 1)).map((s) => <option key={s.number} value={s.number}>S{s.number}</option>)}</select></label></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selected.squadEffort.map((effort) => <div key={effort.squadId} className="rounded-lg bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-800">{effort.squadName}</p><p className="mt-1 text-xs text-slate-600">Dev {effort.devMd} · Test {effort.testMd} · Total {effort.totalMd} MD</p></div>)}</div></section>}
+    {selected && selected.status === "scheduled" && <section className="mt-6 rounded-xl border border-blue-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Selected project</p><h2 className="mt-1 text-lg font-semibold text-slate-950">{selected.name}</h2><p className="text-sm text-slate-500">{selected.businessUnit} · {selected.totalEffortMd} MD total</p></div><button onClick={() => unschedule(selected.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Return to backlog</button></div>{!summaries.get(selected.id)?.readyForPlanning && <p role="alert" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">This scheduled project no longer has a valid estimate. Its roadmap position is preserved; complete the estimate or return it to the backlog.</p>}<div className="mt-4 flex flex-wrap gap-3"><label className="text-sm font-medium text-slate-700">Start sprint<select value={selected.scheduledStartSprint ?? 1} onChange={(e) => { const start = Number(e.target.value); updateProject(selected.id, { scheduledStartSprint: start, scheduledEndSprint: Math.max(start, selected.scheduledEndSprint ?? start) }); }} className="ml-2 rounded-lg border border-slate-300 px-2 py-1.5">{sprints.map((s) => <option key={s.number} value={s.number}>S{s.number}</option>)}</select></label><label className="text-sm font-medium text-slate-700">End sprint<select value={selected.scheduledEndSprint ?? 1} onChange={(e) => updateProject(selected.id, { scheduledEndSprint: Number(e.target.value) })} className="ml-2 rounded-lg border border-slate-300 px-2 py-1.5">{sprints.filter((s) => s.number >= (selected.scheduledStartSprint ?? 1)).map((s) => <option key={s.number} value={s.number}>S{s.number}</option>)}</select></label></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{selected.squadEffort.map((effort) => <div key={effort.squadId} className="rounded-lg bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-800">{effort.squadName}</p><p className="mt-1 text-xs text-slate-600">Dev {effort.devMd} · Test {effort.testMd} · Total {effort.totalMd} MD</p></div>)}</div></section>}
 
     <section className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-4"><h2 className="font-semibold text-slate-950">Squad capacity / Remaining man-days</h2><p className="mt-1 text-xs text-slate-500">Edit each squad’s per-sprint capacity. Negative values are marked over capacity.</p></div>{state.squads.length === 0 ? <p className="p-6 text-sm text-slate-500">Configure at least one squad to calculate capacity.</p> : <div className="overflow-x-auto"><table className="border-collapse text-sm" style={{ minWidth: 220 + sprints.length * 88 }}><thead><tr><th className="sticky left-0 z-10 w-56 border-b border-r border-slate-200 bg-white p-3 text-left">Squad / Capacity</th>{sprints.map((s) => <th key={s.number} className="w-[88px] border-b border-r border-slate-200 p-2 text-center text-xs text-slate-600">S{s.number}</th>)}</tr></thead><tbody>{state.squads.map((squad) => { const related = selected?.squadEffort.some((e) => e.squadId === squad.id); return <tr key={squad.id} className={related ? "bg-blue-50/60" : ""}><th className={`sticky left-0 z-10 border-b border-r border-slate-200 p-3 text-left ${related ? "bg-blue-50" : "bg-white"}`}><span className="block font-semibold text-slate-800">{squad.name}</span><label className="mt-1 block text-xs font-normal text-slate-500"><input aria-label={`${squad.name} capacity per sprint`} type="number" min="0" step="0.5" value={squad.capacityMd} onChange={(e) => setState((current) => ({ ...current, squads: current.squads.map((s) => s.id === squad.id ? { ...s, capacityMd: Number(e.target.value) } : s) }))} className="mr-1 w-16 rounded border border-slate-300 px-1.5 py-1 text-right text-slate-800" />MD / sprint</label></th>{capacity[squad.id]?.map((value, index) => { const low = value >= 0 && value <= squad.capacityMd * 0.2; return <td key={index} title={`${squad.name}, Sprint ${index + 1}: ${value < 0 ? "Over capacity by" : "Remaining"} ${Math.abs(value).toFixed(1)} MD`} className={`border-b border-r border-slate-200 p-2 text-center font-semibold ${value < 0 ? "bg-red-50 text-red-800" : low ? "bg-amber-50 text-amber-800" : "text-slate-700"}`}><span className="block">{Number(value.toFixed(1))} MD</span>{value < 0 && <span className="block text-[10px] uppercase">Over</span>}</td>; })}</tr>; })}</tbody></table></div>}</section>
+    </>}
   </div>;
 }

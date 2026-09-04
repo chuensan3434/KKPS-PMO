@@ -28,3 +28,40 @@ export type PlanningState = {
   projects: PlanningProject[];
   squads: SquadCapacity[];
 };
+
+export type RequirementStatus = "not-started" | "in-progress" | "estimated";
+
+export type RequirementSquadEstimate = {
+  squadId: string;
+  devMd: number | null;
+  testMd: number | null;
+};
+
+export type PlanningRequirement = {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  status: RequirementStatus;
+  estimates: RequirementSquadEstimate[];
+};
+
+export type ProjectEstimation = {
+  projectId: string;
+  requirements: PlanningRequirement[];
+};
+
+export type EstimationState = {
+  version: 1;
+  projects: ProjectEstimation[];
+};
+
+export type ProjectEstimationSummary = {
+  projectId: string;
+  totalDevMd: number;
+  totalTestMd: number;
+  totalMd: number;
+  squadEffort: SquadEffort[];
+  readyForPlanning: boolean;
+};
