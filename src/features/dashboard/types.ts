@@ -50,3 +50,26 @@ export type WorkSummary = {
   bySquad: SummaryItem[];
   byPerson: SummaryItem[];
 };
+
+export type EffortShare = {
+  label: string;
+  hours: number;
+  percentage: number;
+};
+
+export type CustomerPortfolioItem = {
+  customer: string;
+  hours: number;
+  percentage: number;
+  projectCount: number;
+  projects: EffortShare[];
+};
+
+export type ProjectAnalysis = {
+  key: string;
+  customer: string;
+  project: string;
+  totalHours: number;
+  roles: EffortShare[];
+  tasks: EffortShare[];
+};

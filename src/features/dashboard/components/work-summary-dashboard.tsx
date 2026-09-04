@@ -2,8 +2,10 @@
 
 import { useMemo, useRef, useState } from "react";
 import { parseActitimeCsv } from "../actitime-parser";
-import type { SummaryItem, WorkEntry, WorkFilters } from "../types";
+import type { EffortShare, SummaryItem, WorkEntry, WorkFilters } from "../types";
 import {
+  buildCustomerPortfolio,
+  buildProjectAnalyses,
   emptyFilters,
   filterWorkEntries,
   getContextualDateRange,
@@ -15,6 +17,10 @@ import {
 
 function formatHours(hours: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(hours);
+}
+
+function formatPercentage(percentage: number) {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(percentage)}%`;
 }
 
 function SummaryList({ title, items }: Readonly<{ title: string; items: SummaryItem[] }>) {
@@ -34,6 +40,27 @@ function SummaryList({ title, items }: Readonly<{ title: string; items: SummaryI
         </ul>
       ) : (
         <p className="mt-4 text-sm text-slate-500">No hours match the current filters.</p>
+      )}
+    </section>
+  );
+}
+
+function EffortBreakdown({ title, items }: Readonly<{ title: string; items: EffortShare[] }>) {
+  return (
+    <section>
+      <h3 className="font-semibold text-slate-950">{title}</h3>
+      {items.length ? (
+        <ul className="mt-3 divide-y divide-slate-100">
+          {items.map((item) => (
+            <li key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <span className="break-words text-sm text-slate-700">{item.label}</span>
+              <span className="text-right text-sm font-semibold tabular-nums text-slate-950">{formatHours(item.hours)} h</span>
+              <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(item.percentage)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm text-slate-500">No applicable {title.toLowerCase()}.</p>
       )}
     </section>
   );
@@ -74,11 +101,15 @@ export function WorkSummaryDashboard() {
   const [hasProcessed, setHasProcessed] = useState(false);
   const [skippedRows, setSkippedRows] = useState(0);
   const [filters, setFilters] = useState<WorkFilters>(emptyFilters);
+  const [selectedProjectKey, setSelectedProjectKey] = useState("");
 
   const filteredEntries = useMemo(() => filterWorkEntries(entries, filters), [entries, filters]);
   const summary = useMemo(() => summarizeWork(filteredEntries), [filteredEntries]);
   const options = useMemo(() => getContextualFilterOptions(entries, filters), [entries, filters]);
   const dateRange = useMemo(() => getContextualDateRange(entries, filters), [entries, filters]);
+  const customerPortfolio = useMemo(() => buildCustomerPortfolio(filteredEntries), [filteredEntries]);
+  const projectAnalyses = useMemo(() => buildProjectAnalyses(filteredEntries), [filteredEntries]);
+  const selectedProject = projectAnalyses.find(({ key }) => key === selectedProjectKey) ?? projectAnalyses[0];
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -97,6 +128,7 @@ export function WorkSummaryDashboard() {
       setEntries(result.entries);
       setSkippedRows(result.skippedEntryRows);
       setFilters(emptyFilters);
+      setSelectedProjectKey("");
       setHasProcessed(true);
     } catch (caughtError) {
       setEntries([]);
@@ -215,14 +247,84 @@ export function WorkSummaryDashboard() {
           </section>
 
           <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            <SummaryList title="Hours by customer" items={summary.byCustomer} />
-            <SummaryList title="Hours by project" items={summary.byProject} />
-            <SummaryList title="Hours by task" items={summary.byTask} />
             <SummaryList title="Hours by role" items={summary.byRole} />
             <SummaryList title="Hours by source group" items={summary.bySourceGroup} />
             <SummaryList title="Hours by squad" items={summary.bySquad} />
             <SummaryList title="Hours by person" items={summary.byPerson} />
           </div>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="customer-portfolio-title">
+            <div>
+              <h2 id="customer-portfolio-title" className="text-lg font-semibold text-slate-950">Customer Portfolio</h2>
+              <p className="mt-1 text-sm text-slate-500">Recorded effort by customer. Expand a customer to inspect its projects.</p>
+            </div>
+            {customerPortfolio.length ? (
+              <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
+                {customerPortfolio.map((customer) => (
+                  <details key={customer.customer} className="group py-1">
+                    <summary className="grid min-h-12 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 marker:hidden sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                      <span className="flex min-w-0 items-start gap-2 break-words text-sm font-semibold text-slate-950 group-open:text-blue-700">
+                        <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-90">›</span>
+                        {customer.customer}
+                      </span>
+                      <span className="text-right text-sm font-semibold tabular-nums text-slate-950">{formatHours(customer.hours)} h</span>
+                      <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(customer.percentage)}</span>
+                      <span className="col-span-2 text-xs text-slate-500 sm:col-span-1 sm:text-right sm:text-sm">{customer.projectCount} {customer.projectCount === 1 ? "project" : "projects"}</span>
+                    </summary>
+                    <div className="mb-3 ml-3 border-l-2 border-blue-100 pl-4 sm:ml-5 sm:pl-5">
+                      {customer.projects.length ? (
+                        <ul className="divide-y divide-slate-100">
+                          {customer.projects.map((project) => (
+                            <li key={project.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                              <span className="break-words text-sm text-slate-700">{project.label}</span>
+                              <span className="text-right text-sm font-medium tabular-nums text-slate-950">{formatHours(project.hours)} h</span>
+                              <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(project.percentage)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <p className="py-3 text-sm text-slate-500">No applicable projects.</p>}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            ) : <p className="mt-5 text-sm text-slate-500">No customer effort matches the current filters.</p>}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="project-analysis-title">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 id="project-analysis-title" className="text-lg font-semibold text-slate-950">Project Analysis</h2>
+                <p className="mt-1 text-sm text-slate-500">Inspect role and task effort within its customer context.</p>
+              </div>
+              {projectAnalyses.length ? (
+                <label className="grid w-full gap-2 text-sm font-medium text-slate-700 lg:max-w-xl">
+                  Project
+                  <select
+                    value={selectedProject?.key ?? ""}
+                    onChange={(event) => setSelectedProjectKey(event.target.value)}
+                    className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  >
+                    {projectAnalyses.map((analysis) => (
+                      <option key={analysis.key} value={analysis.key}>{analysis.customer} — {analysis.project}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+            {selectedProject ? (
+              <div className="mt-6">
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">{selectedProject.customer}</p>
+                  <h3 className="mt-1 break-words font-semibold text-slate-950">{selectedProject.project}</h3>
+                  <p className="mt-3 text-2xl font-bold tabular-nums text-slate-950">{formatHours(selectedProject.totalHours)} h</p>
+                </div>
+                <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
+                  <EffortBreakdown title="Role breakdown" items={selectedProject.roles} />
+                  <EffortBreakdown title="Task breakdown" items={selectedProject.tasks} />
+                </div>
+              </div>
+            ) : <p className="mt-5 text-sm text-slate-500">No project effort matches the current filters.</p>}
+          </section>
         </>
       ) : null}
     </div>

@@ -1,4 +1,12 @@
-import type { SummaryItem, WorkEntry, WorkFilterOptions, WorkFilters, WorkSummary } from "./types";
+import type {
+  CustomerPortfolioItem,
+  ProjectAnalysis,
+  SummaryItem,
+  WorkEntry,
+  WorkFilterOptions,
+  WorkFilters,
+  WorkSummary,
+} from "./types";
 
 export const NO_SQUAD_VALUE = "__NO_SQUAD__";
 
@@ -121,6 +129,88 @@ function groupHours(entries: WorkEntry[], getLabel: (entry: WorkEntry) => string
   return [...totals.entries()]
     .map(([label, hours]) => ({ label, hours }))
     .sort((first, second) => second.hours - first.hours || first.label.localeCompare(second.label));
+}
+
+function percentage(hours: number, totalHours: number) {
+  return totalHours > 0 ? (hours / totalHours) * 100 : 0;
+}
+
+export function buildCustomerPortfolio(entries: WorkEntry[]): CustomerPortfolioItem[] {
+  const customerHours = new Map<string, number>();
+  const projectHours = new Map<string, Map<string, number>>();
+  let filteredTotalHours = 0;
+
+  entries.forEach((entry) => {
+    filteredTotalHours += entry.hours;
+    customerHours.set(entry.customer, (customerHours.get(entry.customer) ?? 0) + entry.hours);
+    const projects = projectHours.get(entry.customer) ?? new Map<string, number>();
+    projects.set(entry.project, (projects.get(entry.project) ?? 0) + entry.hours);
+    projectHours.set(entry.customer, projects);
+  });
+
+  return [...customerHours.entries()]
+    .map(([customer, hours]) => {
+      const projects = [...(projectHours.get(customer) ?? new Map()).entries()]
+        .map(([label, projectTotal]) => ({
+          label,
+          hours: projectTotal,
+          percentage: percentage(projectTotal, hours),
+        }))
+        .sort((first, second) => second.hours - first.hours || first.label.localeCompare(second.label));
+      return {
+        customer,
+        hours,
+        percentage: percentage(hours, filteredTotalHours),
+        projectCount: projects.length,
+        projects,
+      };
+    })
+    .sort((first, second) => second.hours - first.hours || first.customer.localeCompare(second.customer));
+}
+
+export function buildProjectAnalyses(entries: WorkEntry[]): ProjectAnalysis[] {
+  const projects = new Map<string, {
+    customer: string;
+    project: string;
+    totalHours: number;
+    roles: Map<string, number>;
+    tasks: Map<string, number>;
+  }>();
+
+  entries.forEach((entry) => {
+    const key = `${entry.customer}\u0000${entry.project}`;
+    const analysis = projects.get(key) ?? {
+      customer: entry.customer,
+      project: entry.project,
+      totalHours: 0,
+      roles: new Map<string, number>(),
+      tasks: new Map<string, number>(),
+    };
+    analysis.totalHours += entry.hours;
+    analysis.roles.set(entry.role, (analysis.roles.get(entry.role) ?? 0) + entry.hours);
+    analysis.tasks.set(entry.task, (analysis.tasks.get(entry.task) ?? 0) + entry.hours);
+    projects.set(key, analysis);
+  });
+
+  const breakdown = (values: Map<string, number>, totalHours: number) =>
+    [...values.entries()]
+      .map(([label, hours]) => ({ label, hours, percentage: percentage(hours, totalHours) }))
+      .sort((first, second) => second.hours - first.hours || first.label.localeCompare(second.label));
+
+  return [...projects.entries()]
+    .map(([key, analysis]) => ({
+      key,
+      customer: analysis.customer,
+      project: analysis.project,
+      totalHours: analysis.totalHours,
+      roles: breakdown(analysis.roles, analysis.totalHours),
+      tasks: breakdown(analysis.tasks, analysis.totalHours),
+    }))
+    .sort((first, second) =>
+      second.totalHours - first.totalHours ||
+      first.customer.localeCompare(second.customer) ||
+      first.project.localeCompare(second.project),
+    );
 }
 
 export function summarizeWork(entries: WorkEntry[]): WorkSummary {
