@@ -83,6 +83,8 @@ Authentication is a future module and must not be introduced implicitly.
 - Prefer Server Components when browser state, events, or hooks are not required.
 - Add `"use client"` only at the lowest boundary that needs browser behavior.
 - Separate data and business concerns from large presentation components.
+- Keep business filtering and aggregation in reusable feature logic outside presentation components.
+- Derive filter option lists contextually from records matching all other active filters, ignoring the filter's own value.
 - Place reusable UI in established shared components.
 - Keep route and page files focused on route composition rather than entire feature implementations.
 - Preserve clean existing patterns instead of inventing parallel architecture.

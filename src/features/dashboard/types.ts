@@ -16,11 +16,23 @@ export type WorkEntry = {
 export type WorkFilters = {
   dateFrom: string;
   dateTo: string;
-  role: string;
+  customer: string;
+  project: string;
+  task: string;
   sourceGroup: string;
   squad: string;
+  role: string;
   person: string;
-  project: string;
+};
+
+export type WorkFilterOptions = {
+  customer: string[];
+  project: string[];
+  task: string[];
+  sourceGroup: string[];
+  squad: string[];
+  role: string[];
+  person: string[];
 };
 
 export type SummaryItem = {
@@ -30,9 +42,11 @@ export type SummaryItem = {
 
 export type WorkSummary = {
   totalHours: number;
+  byCustomer: SummaryItem[];
+  byProject: SummaryItem[];
+  byTask: SummaryItem[];
   byRole: SummaryItem[];
   bySourceGroup: SummaryItem[];
   bySquad: SummaryItem[];
   byPerson: SummaryItem[];
-  byProject: SummaryItem[];
 };

@@ -3,7 +3,15 @@
 import { useMemo, useRef, useState } from "react";
 import { parseActitimeCsv } from "../actitime-parser";
 import type { SummaryItem, WorkEntry, WorkFilters } from "../types";
-import { emptyFilters, filterWorkEntries, summarizeWork, uniqueOptions } from "../work-summary";
+import {
+  emptyFilters,
+  filterWorkEntries,
+  getContextualDateRange,
+  getContextualFilterOptions,
+  NO_SQUAD_VALUE,
+  reconcileWorkFilters,
+  summarizeWork,
+} from "../work-summary";
 
 function formatHours(hours: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(hours);
@@ -69,23 +77,8 @@ export function WorkSummaryDashboard() {
 
   const filteredEntries = useMemo(() => filterWorkEntries(entries, filters), [entries, filters]);
   const summary = useMemo(() => summarizeWork(filteredEntries), [filteredEntries]);
-  const options = useMemo(
-    () => ({
-      roles: uniqueOptions(entries, (entry) => entry.role),
-      sourceGroups: uniqueOptions(entries, (entry) => entry.sourceGroup),
-      squads: uniqueOptions(
-        entries.filter((entry) => entry.squad !== null),
-        (entry) => entry.squad ?? "",
-      ),
-      people: uniqueOptions(entries, (entry) => entry.person),
-      projects: uniqueOptions(entries, (entry) => entry.project),
-    }),
-    [entries],
-  );
-  const dateRange = useMemo(() => {
-    const dates = entries.map((entry) => entry.date).sort();
-    return { min: dates[0] ?? "", max: dates.at(-1) ?? "" };
-  }, [entries]);
+  const options = useMemo(() => getContextualFilterOptions(entries, filters), [entries, filters]);
+  const dateRange = useMemo(() => getContextualDateRange(entries, filters), [entries, filters]);
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -115,7 +108,7 @@ export function WorkSummaryDashboard() {
   }
 
   function updateFilter(name: keyof WorkFilters, value: string) {
-    setFilters((current) => ({ ...current, [name]: value }));
+    setFilters((current) => reconcileWorkFilters(entries, { ...current, [name]: value }, name));
   }
 
   return (
@@ -200,16 +193,18 @@ export function WorkSummaryDashboard() {
                   className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 />
               </label>
-              <FilterSelect label="Role" value={filters.role} options={options.roles} onChange={(value) => updateFilter("role", value)} />
-              <FilterSelect label="Source group" value={filters.sourceGroup} options={options.sourceGroups} onChange={(value) => updateFilter("sourceGroup", value)} />
+              <FilterSelect label="Customer" value={filters.customer} options={options.customer} onChange={(value) => updateFilter("customer", value)} />
+              <FilterSelect label="Project" value={filters.project} options={options.project} onChange={(value) => updateFilter("project", value)} />
+              <FilterSelect label="Task" value={filters.task} options={options.task} onChange={(value) => updateFilter("task", value)} />
+              <FilterSelect label="Source group" value={filters.sourceGroup} options={options.sourceGroup} onChange={(value) => updateFilter("sourceGroup", value)} />
               <FilterSelect
                 label="Squad"
                 value={filters.squad}
-                options={[...options.squads, { label: "No squad", value: "__NO_SQUAD__" }]}
+                options={options.squad.map((value) => value === NO_SQUAD_VALUE ? { label: "No squad", value } : value)}
                 onChange={(value) => updateFilter("squad", value)}
               />
-              <FilterSelect label="Person" value={filters.person} options={options.people} onChange={(value) => updateFilter("person", value)} />
-              <FilterSelect label="Project" value={filters.project} options={options.projects} onChange={(value) => updateFilter("project", value)} />
+              <FilterSelect label="Role" value={filters.role} options={options.role} onChange={(value) => updateFilter("role", value)} />
+              <FilterSelect label="Person" value={filters.person} options={options.person} onChange={(value) => updateFilter("person", value)} />
             </div>
           </section>
 
@@ -220,11 +215,13 @@ export function WorkSummaryDashboard() {
           </section>
 
           <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <SummaryList title="Hours by customer" items={summary.byCustomer} />
+            <SummaryList title="Hours by project" items={summary.byProject} />
+            <SummaryList title="Hours by task" items={summary.byTask} />
             <SummaryList title="Hours by role" items={summary.byRole} />
             <SummaryList title="Hours by source group" items={summary.bySourceGroup} />
             <SummaryList title="Hours by squad" items={summary.bySquad} />
             <SummaryList title="Hours by person" items={summary.byPerson} />
-            <SummaryList title="Hours by project" items={summary.byProject} />
           </div>
         </>
       ) : null}
