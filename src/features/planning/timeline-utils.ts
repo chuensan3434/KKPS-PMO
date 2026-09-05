@@ -2,6 +2,10 @@ import type { PlanningProject } from "./types";
 
 export type PackedProject = { project: PlanningProject; lane: number };
 
+export function getSprintDuration(startSprint: number, endSprint: number) {
+  return Math.max(1, endSprint - startSprint + 1);
+}
+
 export function clampSprintRange(start: number, end: number, sprintCount: number) {
   const safeStart = Math.max(1, Math.min(sprintCount, Math.round(start)));
   const safeEnd = Math.max(safeStart, Math.min(sprintCount, Math.round(end)));
