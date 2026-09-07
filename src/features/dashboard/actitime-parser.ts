@@ -1,12 +1,24 @@
 import type { WorkEntry } from "./types";
 
-const requiredHeaders = [
+const legacyHeaders = [
   "Customer",
   "Project",
   "Task",
   "Type of Work",
   "Day",
   "User",
+  "Spent Time",
+  "Comments",
+] as const;
+
+const detailedHeaders = [
+  "Customer",
+  "Project",
+  "Task",
+  "Type of Work",
+  "Day",
+  "User",
+  "Team",
   "Spent Time",
   "Comments",
 ] as const;
@@ -157,22 +169,26 @@ export function parseActitimeCsv(source: string): ParseResult {
   const rows = parseCsvRows(source.replace(/^\uFEFF/, ""));
   const headerIndex = rows.findIndex((row) => {
     const values = row.map((value) => value.trim());
-    return requiredHeaders.every((name) => values.includes(name));
+    return (
+      detailedHeaders.every((name, index) => values[index] === name) ||
+      legacyHeaders.every((name) => values.includes(name))
+    );
   });
   const header = headerIndex >= 0 ? rows[headerIndex].map((value) => value.trim()) : null;
 
-  if (!header || requiredHeaders.some((name) => !header.includes(name))) {
-    throw new Error(`The CSV must include these columns: ${requiredHeaders.join(", ")}.`);
+  if (!header || legacyHeaders.some((name) => !header.includes(name))) {
+    throw new Error(`The CSV must include these columns: ${detailedHeaders.join(", ")}.`);
   }
 
   const column = Object.fromEntries(header.map((name, index) => [name, index]));
+  const isDetailedExport = detailedHeaders.every((name, index) => header[index] === name);
   const entries: WorkEntry[] = [];
   let customer = "";
   let project = "";
   let skippedEntryRows = 0;
 
   for (const rawRow of rows.slice(headerIndex + 1)) {
-    const get = (name: (typeof requiredHeaders)[number]) =>
+    const get = (name: (typeof detailedHeaders)[number]) =>
       (rawRow[column[name]] ?? "").trim();
     const rowCustomer = get("Customer");
     const rowProject = get("Project");
@@ -182,13 +198,20 @@ export function parseActitimeCsv(source: string): ParseResult {
     const user = get("User");
     const spentTime = get("Spent Time");
 
-    if (rowCustomer && !rowProject && !task && !typeOfWork && !day && !user) {
+    if (rowCustomer.toLocaleLowerCase("en-US").startsWith("total:")) continue;
+
+    if (isDetailedExport) {
+      customer = rowCustomer;
+      project = rowProject;
+    }
+
+    if (!isDetailedExport && rowCustomer && !rowProject && !task && !typeOfWork && !day && !user) {
       customer = rowCustomer;
       project = "";
       continue;
     }
 
-    if (rowProject && !rowCustomer && !task && !typeOfWork && !day && !user) {
+    if (!isDetailedExport && rowProject && !rowCustomer && !task && !typeOfWork && !day && !user) {
       project = rowProject;
       continue;
     }
@@ -204,6 +227,7 @@ export function parseActitimeCsv(source: string): ParseResult {
     }
 
     const identity = parseWorkforceIdentity(user);
+    const team = get("Team");
     entries.push({
       customer,
       project,
@@ -212,6 +236,7 @@ export function parseActitimeCsv(source: string): ParseResult {
       date,
       user,
       ...identity,
+      sourceGroup: team || identity.sourceGroup,
       hours,
       comments: get("Comments"),
     });
