@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { loadPlanningState } from "@/features/planning/planning-storage";
+import type { PlanningState } from "@/features/planning/types";
 import { parseActitimeCsv } from "../actitime-parser";
+import { buildResourcePortfolio, getEstimatedMandays, getPortfolioPeriodLabel } from "../resource-portfolio";
 import type { EffortShare, SummaryItem, WorkEntry, WorkFilters } from "../types";
+import { ResourcePortfolioDashboard } from "./resource-portfolio-dashboard";
 import {
   buildCustomerPortfolio,
   buildProjectAnalyses,
@@ -102,6 +106,13 @@ export function WorkSummaryDashboard() {
   const [skippedRows, setSkippedRows] = useState(0);
   const [filters, setFilters] = useState<WorkFilters>(emptyFilters);
   const [selectedProjectKey, setSelectedProjectKey] = useState("");
+  const [activeView, setActiveView] = useState<"summary" | "customer" | "resource">("summary");
+  const [planning, setPlanning] = useState<PlanningState | null>(null);
+
+  useEffect(() => {
+    const loadedPlanning = loadPlanningState();
+    queueMicrotask(() => setPlanning(loadedPlanning));
+  }, []);
 
   const filteredEntries = useMemo(() => filterWorkEntries(entries, filters), [entries, filters]);
   const summary = useMemo(() => summarizeWork(filteredEntries), [filteredEntries]);
@@ -109,6 +120,15 @@ export function WorkSummaryDashboard() {
   const dateRange = useMemo(() => getContextualDateRange(entries, filters), [entries, filters]);
   const customerPortfolio = useMemo(() => buildCustomerPortfolio(filteredEntries), [filteredEntries]);
   const projectAnalyses = useMemo(() => buildProjectAnalyses(filteredEntries), [filteredEntries]);
+  const resourcePortfolio = useMemo(() => buildResourcePortfolio(filteredEntries), [filteredEntries]);
+  const effectiveDateFrom = filters.dateFrom || dateRange.min;
+  const effectiveDateTo = filters.dateTo || dateRange.max;
+  const estimatedMandays = useMemo(() => getEstimatedMandays(planning, {
+    dateFrom: effectiveDateFrom,
+    dateTo: effectiveDateTo,
+    customer: filters.customer,
+    project: filters.project,
+  }), [effectiveDateFrom, effectiveDateTo, filters.customer, filters.project, planning]);
   const selectedProject = projectAnalyses.find(({ key }) => key === selectedProjectKey) ?? projectAnalyses[0];
 
   async function handleFile(file: File | undefined) {
@@ -240,6 +260,15 @@ export function WorkSummaryDashboard() {
             </div>
           </section>
 
+          <nav className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Dashboard views">
+            {([['summary', 'Work Summary'], ['customer', 'Customer Portfolio'], ['resource', 'Resource Portfolio']] as const).map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setActiveView(value)} aria-current={activeView === value ? "page" : undefined} className={`min-h-11 shrink-0 rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${activeView === value ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {activeView === "summary" ? <>
           <section className="rounded-xl bg-blue-700 p-6 text-white shadow-sm" aria-label="Total hours">
             <p className="text-sm font-medium text-blue-100">Total hours</p>
             <p className="mt-2 text-4xl font-bold tracking-tight tabular-nums">{formatHours(summary.totalHours)}</p>
@@ -252,43 +281,6 @@ export function WorkSummaryDashboard() {
             <SummaryList title="Hours by squad" items={summary.bySquad} />
             <SummaryList title="Hours by person" items={summary.byPerson} />
           </div>
-
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="customer-portfolio-title">
-            <div>
-              <h2 id="customer-portfolio-title" className="text-lg font-semibold text-slate-950">Customer Portfolio</h2>
-              <p className="mt-1 text-sm text-slate-500">Recorded effort by customer. Expand a customer to inspect its projects.</p>
-            </div>
-            {customerPortfolio.length ? (
-              <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
-                {customerPortfolio.map((customer) => (
-                  <details key={customer.customer} className="group py-1">
-                    <summary className="grid min-h-12 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 marker:hidden sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-                      <span className="flex min-w-0 items-start gap-2 break-words text-sm font-semibold text-slate-950 group-open:text-blue-700">
-                        <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-90">›</span>
-                        {customer.customer}
-                      </span>
-                      <span className="text-right text-sm font-semibold tabular-nums text-slate-950">{formatHours(customer.hours)} h</span>
-                      <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(customer.percentage)}</span>
-                      <span className="col-span-2 text-xs text-slate-500 sm:col-span-1 sm:text-right sm:text-sm">{customer.projectCount} {customer.projectCount === 1 ? "project" : "projects"}</span>
-                    </summary>
-                    <div className="mb-3 ml-3 border-l-2 border-blue-100 pl-4 sm:ml-5 sm:pl-5">
-                      {customer.projects.length ? (
-                        <ul className="divide-y divide-slate-100">
-                          {customer.projects.map((project) => (
-                            <li key={project.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                              <span className="break-words text-sm text-slate-700">{project.label}</span>
-                              <span className="text-right text-sm font-medium tabular-nums text-slate-950">{formatHours(project.hours)} h</span>
-                              <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(project.percentage)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : <p className="py-3 text-sm text-slate-500">No applicable projects.</p>}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            ) : <p className="mt-5 text-sm text-slate-500">No customer effort matches the current filters.</p>}
-          </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="project-analysis-title">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -325,6 +317,47 @@ export function WorkSummaryDashboard() {
               </div>
             ) : <p className="mt-5 text-sm text-slate-500">No project effort matches the current filters.</p>}
           </section>
+          </> : null}
+
+          {activeView === "customer" ?
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="customer-portfolio-title">
+            <div>
+              <h2 id="customer-portfolio-title" className="text-lg font-semibold text-slate-950">Customer Portfolio</h2>
+              <p className="mt-1 text-sm text-slate-500">Recorded effort by customer. Expand a customer to inspect its projects.</p>
+            </div>
+            {customerPortfolio.length ? (
+              <div className="mt-5 divide-y divide-slate-200 border-y border-slate-200">
+                {customerPortfolio.map((customer) => (
+                  <details key={customer.customer} className="group py-1">
+                    <summary className="grid min-h-12 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 marker:hidden sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                      <span className="flex min-w-0 items-start gap-2 break-words text-sm font-semibold text-slate-950 group-open:text-blue-700">
+                        <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-90">›</span>
+                        {customer.customer}
+                      </span>
+                      <span className="text-right text-sm font-semibold tabular-nums text-slate-950">{formatHours(customer.hours)} h</span>
+                      <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(customer.percentage)}</span>
+                      <span className="col-span-2 text-xs text-slate-500 sm:col-span-1 sm:text-right sm:text-sm">{customer.projectCount} {customer.projectCount === 1 ? "project" : "projects"}</span>
+                    </summary>
+                    <div className="mb-3 ml-3 border-l-2 border-blue-100 pl-4 sm:ml-5 sm:pl-5">
+                      {customer.projects.length ? (
+                        <ul className="divide-y divide-slate-100">
+                          {customer.projects.map((project) => (
+                            <li key={project.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                              <span className="break-words text-sm text-slate-700">{project.label}</span>
+                              <span className="text-right text-sm font-medium tabular-nums text-slate-950">{formatHours(project.hours)} h</span>
+                              <span className="col-start-2 text-right text-xs tabular-nums text-slate-500 sm:col-start-auto sm:text-sm">{formatPercentage(project.percentage)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <p className="py-3 text-sm text-slate-500">No applicable projects.</p>}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            ) : <p className="mt-5 text-sm text-slate-500">No customer effort matches the current filters.</p>}
+          </section> : null}
+
+          {activeView === "resource" ? <ResourcePortfolioDashboard portfolio={resourcePortfolio} periodLabel={getPortfolioPeriodLabel(effectiveDateFrom, effectiveDateTo)} estimatedMandays={estimatedMandays} /> : null}
         </>
       ) : null}
     </div>

@@ -73,3 +73,35 @@ export type ProjectAnalysis = {
   roles: EffortShare[];
   tasks: EffortShare[];
 };
+
+export type ServiceArea = "app" | "infra" | "unmapped";
+export type WorkType = "project" | "support";
+
+export type ResourcePortfolioRow = {
+  customer: string;
+  projectHours: number;
+  supportHours: number;
+  totalHours: number;
+  projectMandays: number;
+  supportMandays: number;
+  totalMandays: number;
+  projectPct: number;
+  supportPct: number;
+  totalPct: number;
+};
+
+export type ResourcePortfolioArea = {
+  serviceArea: ServiceArea;
+  projectHours: number;
+  supportHours: number;
+  totalHours: number;
+  rows: ResourcePortfolioRow[];
+};
+
+export type ResourcePortfolio = {
+  totalHours: number;
+  departments: EffortShare[];
+  app: ResourcePortfolioArea;
+  infra: ResourcePortfolioArea;
+  unmapped: ResourcePortfolioArea;
+};
