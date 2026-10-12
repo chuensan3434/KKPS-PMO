@@ -38,9 +38,13 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Verification
 
 ```bash
+npm test
+npm run test:browser
 npm run lint
 npm run build
 ```
+
+Planning Phase 0–1 local database setup, security posture, browser-data backup, and optional sprint seeding are documented in [`docs/PLANNING_PHASE_0_1.md`](docs/PLANNING_PHASE_0_1.md).
 
 The homepage does not query Supabase, so builds do not depend on live database records. Supabase helpers validate the required configuration when a client is created and report a clear error when it is missing.
 
