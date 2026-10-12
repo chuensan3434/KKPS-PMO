@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   archive: vi.fn(),
+  squadList: vi.fn(),
+  effortList: vi.fn(),
 }));
 
 vi.mock("../../lib/supabase/client", () => ({
@@ -33,6 +35,8 @@ vi.mock("./repositories", () => ({
     update: mocks.update,
     archive: mocks.archive,
   }),
+  createSquadRepository: () => ({ list: mocks.squadList }),
+  createProjectSquadEffortRepository: () => ({ list: mocks.effortList }),
 }));
 
 const activeProject: Project = {
@@ -53,6 +57,8 @@ beforeEach(() => {
   mocks.signInWithPassword.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
   mocks.list.mockResolvedValue([]);
+  mocks.squadList.mockResolvedValue([]);
+  mocks.effortList.mockResolvedValue([]);
 });
 
 describe("Project Master authentication", () => {
@@ -87,6 +93,7 @@ describe("Project Master CRUD", () => {
     const user = userEvent.setup();
     render(<ProjectMaster />);
 
+    await user.click(await screen.findByRole("tab", { name: "Project Master" }));
     expect(await screen.findByText("Alpha")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Project name"), "Beta");

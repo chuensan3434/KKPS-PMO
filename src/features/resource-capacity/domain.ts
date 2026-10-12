@@ -105,6 +105,25 @@ export const projectSchema = z.object({
 export const projectCreateSchema = projectSchema.omit({ id: true, archived_at: true, created_at: true, updated_at: true });
 export const projectUpdateSchema = projectCreateSchema.partial().refine((value) => Object.keys(value).length > 0, "Provide at least one project change.");
 
+export const projectSquadEffortSchema = z.object({
+  id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  squad_id: z.string().uuid(),
+  dev_md: z.coerce.number().finite().nonnegative(),
+  qa_md: z.coerce.number().finite().nonnegative(),
+  archived_at: timestamp.nullable(),
+  created_at: timestamp,
+  updated_at: timestamp,
+});
+export const projectSquadEffortCreateSchema = projectSquadEffortSchema.pick({
+  project_id: true,
+  squad_id: true,
+  dev_md: true,
+  qa_md: true,
+});
+export const projectSquadEffortUpdateSchema = projectSquadEffortSchema.pick({ dev_md: true, qa_md: true }).partial()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one effort change.");
+
 export type Squad = z.infer<typeof squadSchema>;
 export type SquadCreate = z.input<typeof squadCreateSchema>;
 export type SquadAlias = z.infer<typeof squadAliasSchema>;
@@ -119,6 +138,8 @@ export type Sprint = z.infer<typeof sprintSchema>;
 export type SprintCreate = z.input<typeof sprintCreateSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type ProjectCreate = z.input<typeof projectCreateSchema>;
+export type ProjectSquadEffort = z.infer<typeof projectSquadEffortSchema>;
+export type ProjectSquadEffortCreate = z.input<typeof projectSquadEffortCreateSchema>;
 
 export const MANDAY_HOURS = 8 as const;
 export const CAPACITY_CATEGORIES = ["DEV", "QA", "SUPPORT", "SA", "OTHER"] as const;

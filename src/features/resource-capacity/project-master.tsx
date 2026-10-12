@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { PageContainer } from "../../components/layout/page-container";
 import { createClient } from "../../lib/supabase/client";
 import type { Project } from "./domain";
+import { EffortPlanning, SquadManagement } from "./effort-planning";
 import { createProjectRepository } from "./repositories";
 
 const PROJECT_STATUSES = ["draft", "active", "on_hold", "completed", "cancelled"] as const;
@@ -42,6 +43,7 @@ export function ProjectMaster() {
   const [form, setForm] = useState<ProjectForm>(emptyForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<"projects" | "effort" | "squads">("effort");
 
   useEffect(() => {
     let mounted = true;
@@ -195,13 +197,25 @@ export function ProjectMaster() {
   }
 
   return (
-    <PageContainer title="Project Master" description="Create and maintain projects stored securely in Supabase.">
+    <PageContainer title="Project & Effort Planning" description="Maintain projects, squads, and squad-level Dev and QA effort in Supabase.">
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session.user.email}</span></p>
         <button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div role="tablist" aria-label="Project planning sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {([
+          ["effort", "Effort Planning"],
+          ["projects", "Project Master"],
+          ["squads", "Squad Management"],
+        ] as const).map(([value, label]) => (
+          <button key={value} type="button" role="tab" aria-selected={workspaceView === value} onClick={() => setWorkspaceView(value)} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${workspaceView === value ? "bg-blue-700 text-white" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>
+        ))}
+      </div>
+
+      {workspaceView === "effort" ? <div className="mt-6"><EffortPlanning /></div> : null}
+      {workspaceView === "squads" ? <div className="mt-6"><SquadManagement /></div> : null}
+      {workspaceView === "projects" ? <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <section aria-labelledby="project-list-heading" className="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -267,7 +281,7 @@ export function ProjectMaster() {
             </div>
           </form>
         </section>
-      </div>
+      </div> : null}
     </PageContainer>
   );
 }

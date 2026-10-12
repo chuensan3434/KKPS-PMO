@@ -6,6 +6,9 @@ import {
   personUpdateSchema,
   projectCreateSchema,
   projectSchema,
+  projectSquadEffortCreateSchema,
+  projectSquadEffortSchema,
+  projectSquadEffortUpdateSchema,
   projectUpdateSchema,
   squadAliasCreateSchema,
   squadAliasSchema,
@@ -77,6 +80,12 @@ export function createSquadRepository(client: RepositoryClient) {
       const operation = "Update squad";
       const values = validateInput(operation, squadUpdateSchema, input);
       const { data, error } = await client.from("squads").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive squad";
+      const { data, error } = await client.from("squads").update({ active: false }).eq("id", validateId(operation, id)).select().single();
       databaseError(operation, error);
       return parseRow(operation, squadSchema, data);
     },
@@ -232,6 +241,45 @@ export function createProjectRepository(client: RepositoryClient) {
       const { data, error } = await client.from("projects").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
       databaseError(operation, error);
       return parseRow(operation, projectSchema, data);
+    },
+  };
+}
+
+export function createProjectSquadEffortRepository(client: RepositoryClient) {
+  return {
+    async list(projectId?: string) {
+      const operation = "List project squad efforts";
+      let query = client.from("project_squad_efforts").select("*").order("created_at");
+      if (projectId) query = query.eq("project_id", validateId(operation, projectId));
+      const { data, error } = await query;
+      databaseError(operation, error);
+      return parseRows(operation, projectSquadEffortSchema, data);
+    },
+    async assign(input: unknown) {
+      const operation = "Assign squad to project";
+      const values = validateInput(operation, projectSquadEffortCreateSchema, input);
+      const { data, error } = await client.from("project_squad_efforts").insert(values).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectSquadEffortSchema, data);
+    },
+    async updateEffort(id: string, input: unknown) {
+      const operation = "Update project squad effort";
+      const values = validateInput(operation, projectSquadEffortUpdateSchema, input);
+      const { data, error } = await client.from("project_squad_efforts").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectSquadEffortSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive project squad assignment";
+      const { data, error } = await client.from("project_squad_efforts").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectSquadEffortSchema, data);
+    },
+    async restore(id: string) {
+      const operation = "Restore project squad assignment";
+      const { data, error } = await client.from("project_squad_efforts").update({ archived_at: null }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectSquadEffortSchema, data);
     },
   };
 }
