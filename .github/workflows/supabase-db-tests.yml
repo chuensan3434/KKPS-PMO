@@ -1,0 +1,74 @@
+name: Supabase database tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/supabase-db-tests.yml"
+      - "supabase/**"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-db-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database-tests:
+    name: Migrations and pgTAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install the repository-pinned Supabase CLI
+        run: npm ci
+
+      - name: Verify local-only test inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          test -z "${SUPABASE_DB_PASSWORD:-}"
+          test -z "${DATABASE_URL:-}"
+          test -f supabase/tests/planning_foundation.test_test.sql
+          test -f supabase/tests/phase_2b_effort_planning.test.sql
+          test -f supabase/tests/phase_2c_capacity_periods.test.sql
+          grep -Fq "select plan(38);" supabase/tests/phase_2c_capacity_periods.test.sql
+          npx supabase --version
+
+      - name: Start an isolated local Supabase instance
+        run: >-
+          npx supabase start
+          --exclude studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor
+
+      - name: Apply all migrations to a clean local database
+        run: npx supabase db reset --local --no-seed
+
+      - name: Run Phase 1, Phase 2B, and Phase 2C pgTAP suites
+        run: >-
+          npx supabase test db --local
+          supabase/tests/planning_foundation.test_test.sql
+          supabase/tests/phase_2b_effort_planning.test.sql
+          supabase/tests/phase_2c_capacity_periods.test.sql
+
+      - name: Show local diagnostics after a failure
+        if: failure()
+        run: |
+          npx supabase status || true
+          docker ps --all || true
+
+      - name: Stop and remove the temporary Supabase instance
+        if: always()
+        run: npx supabase stop --no-backup || true
