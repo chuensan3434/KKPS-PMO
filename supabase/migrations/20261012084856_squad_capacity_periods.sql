@@ -94,7 +94,7 @@ begin
     and sequence_number in (new.start_sprint, new.end_sprint);
 
   -- Let the declared foreign keys report missing start/end references.
-  if endpoint_count <> case when new.start_sprint = new.end_sprint then 1 else 2 end then
+  if endpoint_count <> (case when new.start_sprint = new.end_sprint then 1 else 2 end) then
     return new;
   end if;
 
