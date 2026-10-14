@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
+import { isLocalMockDataMode } from "../../../lib/development-mode";
 import type { PlanningState } from "../types";
 import type { Project, ProjectSquadEffort, Sprint, SprintCalendar, Squad, SquadCapacityPeriod } from "../../resource-capacity/domain";
 import { createProjectRepository, createProjectSquadEffortRepository, createSquadCapacityPeriodRepository, createSquadRepository, createSprintRepository } from "../../resource-capacity/repositories";
@@ -25,7 +26,7 @@ export function CapacityPlanning({ planning }: Readonly<{ planning: PlanningStat
   const projectRepository = useMemo(() => createProjectRepository(supabase), [supabase]);
   const effortRepository = useMemo(() => createProjectSquadEffortRepository(supabase), [supabase]);
   const [session, setSession] = useState<Session | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [authReady, setAuthReady] = useState(isLocalMockDataMode);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [calendars, setCalendars] = useState<SprintCalendar[]>([]);
   const [calendarSelection, setCalendarSelection] = useState("");
@@ -45,6 +46,7 @@ export function CapacityPlanning({ planning }: Readonly<{ planning: PlanningStat
   const [mappingError, setMappingError] = useState("");
 
   useEffect(() => {
+    if (isLocalMockDataMode) return;
     let mounted = true;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => { if (mounted) { setSession(next); setAuthReady(true); } });
     void supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setAuthReady(true); } });
@@ -52,7 +54,7 @@ export function CapacityPlanning({ planning }: Readonly<{ planning: PlanningStat
   }, [supabase]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!isLocalMockDataMode && !session) return;
     let current = true;
     void Promise.resolve().then(() => {
       if (current) { setLoading(true); setError(""); }
@@ -72,7 +74,7 @@ export function CapacityPlanning({ planning }: Readonly<{ planning: PlanningStat
   }, [effortRepository, projectRepository, session, sprintRepository, squadRepository]);
 
   useEffect(() => {
-    if (!session || !calendarId) return;
+    if ((!isLocalMockDataMode && !session) || !calendarId) return;
     let current = true;
     void Promise.resolve().then(() => {
       if (current) { setLoading(true); setError(""); }
@@ -159,7 +161,7 @@ export function CapacityPlanning({ planning }: Readonly<{ planning: PlanningStat
   }
 
   if (!authReady) return <p className="mt-6 text-sm text-slate-500">Checking the existing Supabase session…</p>;
-  if (!session) return <section className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-semibold text-amber-950">Supabase session required</h2><p className="mt-1 text-sm text-amber-800">Capacity Periods use the same authenticated session as Project & Effort Planning.</p><Link href="/projects" className="mt-4 inline-flex rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Open Projects to sign in</Link></section>;
+  if (!isLocalMockDataMode && !session) return <section className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-semibold text-amber-950">Supabase session required</h2><p className="mt-1 text-sm text-amber-800">Capacity Periods use the same authenticated session as Project & Effort Planning.</p><Link href="/projects" className="mt-4 inline-flex rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Open Projects to sign in</Link></section>;
 
   const activePeriods = periods.filter((period) => showArchived ? period.archived_at !== null : period.archived_at === null);
   const activeProjects = projects.filter((project) => project.archived_at === null);

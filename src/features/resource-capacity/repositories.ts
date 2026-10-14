@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { isLocalMockDataMode } from "../../lib/development-mode";
+import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockSprintRepository, createMockSquadRepository } from "./mock-repositories";
 import {
   personCreateSchema,
   personSchema,
@@ -65,6 +67,7 @@ function databaseError(operation: string, error: { message: string; code?: strin
 }
 
 export function createSquadRepository(client: RepositoryClient) {
+  if (isLocalMockDataMode) return createMockSquadRepository();
   return {
     async list() {
       const operation = "List squads";
@@ -173,6 +176,7 @@ export function createMembershipRepository(client: RepositoryClient) {
 }
 
 export function createSprintRepository(client: RepositoryClient) {
+  if (isLocalMockDataMode) return createMockSprintRepository();
   return {
     async listCalendars() {
       const operation = "List sprint calendars";
@@ -218,6 +222,7 @@ export function createSprintRepository(client: RepositoryClient) {
 }
 
 export function createProjectRepository(client: RepositoryClient) {
+  if (isLocalMockDataMode) return createMockProjectRepository();
   return {
     async list() {
       const operation = "List projects";
@@ -249,6 +254,7 @@ export function createProjectRepository(client: RepositoryClient) {
 }
 
 export function createProjectSquadEffortRepository(client: RepositoryClient) {
+  if (isLocalMockDataMode) return createMockEffortRepository();
   return {
     async list(projectId?: string) {
       const operation = "List project squad efforts";
@@ -288,6 +294,7 @@ export function createProjectSquadEffortRepository(client: RepositoryClient) {
 }
 
 export function createSquadCapacityPeriodRepository(client: RepositoryClient) {
+  if (isLocalMockDataMode) return createMockCapacityRepository();
   return {
     async list(calendarId?: string) {
       const operation = "List capacity periods";

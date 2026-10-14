@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { PageContainer } from "../../components/layout/page-container";
 import { createClient } from "../../lib/supabase/client";
+import { isLocalMockDataMode } from "../../lib/development-mode";
 import type { Project } from "./domain";
 import { EffortPlanning, SquadManagement } from "./effort-planning";
 import { createProjectRepository } from "./repositories";
@@ -30,7 +31,7 @@ export function ProjectMaster() {
   const supabase = useMemo(() => createClient(), []);
   const repository = useMemo(() => createProjectRepository(supabase), [supabase]);
   const [session, setSession] = useState<Session | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(!isLocalMockDataMode);
   const [authError, setAuthError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,6 +47,7 @@ export function ProjectMaster() {
   const [workspaceView, setWorkspaceView] = useState<"projects" | "effort" | "squads">("effort");
 
   useEffect(() => {
+    if (isLocalMockDataMode) return;
     let mounted = true;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (mounted) {
@@ -68,7 +70,7 @@ export function ProjectMaster() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!isLocalMockDataMode && !session) return;
 
     let current = true;
     async function loadProjects() {
@@ -171,7 +173,7 @@ export function ProjectMaster() {
     return <PageContainer title="Projects" description="Loading your secure Project Master session…" />;
   }
 
-  if (!session) {
+  if (!isLocalMockDataMode && !session) {
     return (
       <PageContainer title="Projects" description="Sign in with your KKPS-PMO account to manage Project Master data.">
         <section className="mt-8 max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -197,10 +199,9 @@ export function ProjectMaster() {
   }
 
   return (
-    <PageContainer title="Project & Effort Planning" description="Maintain projects, squads, and squad-level Dev and QA effort in Supabase.">
+    <PageContainer title="Project & Effort Planning" description={isLocalMockDataMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session.user.email}</span></p>
-        <button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button>
+        {isLocalMockDataMode ? <p className="text-sm font-medium text-amber-800">Local Mock Data Mode — no Supabase records are read or changed.</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
       </div>
 
       <div role="tablist" aria-label="Project planning sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
