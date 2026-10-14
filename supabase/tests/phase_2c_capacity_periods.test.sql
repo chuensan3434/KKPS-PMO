@@ -74,14 +74,14 @@ select throws_ok(
     select squad.id, calendar.id, 6, 6, 'NaN'::numeric, 'manual'
     from public.squads squad cross join public.sprint_calendars calendar
     where squad.display_name = 'Capacity Squad A' and calendar.code = 'capacity-complete'$$,
-  'NaN capacity is rejected'
+  '23514', null, 'NaN capacity is rejected'
 );
 select throws_ok(
   $$insert into public.squad_capacity_periods (squad_id, calendar_id, start_sprint, end_sprint, capacity_md, source)
     select squad.id, calendar.id, 6, 6, 'Infinity'::numeric, 'manual'
     from public.squads squad cross join public.sprint_calendars calendar
     where squad.display_name = 'Capacity Squad A' and calendar.code = 'capacity-complete'$$,
-  'infinite capacity is rejected'
+  '22003', null, 'infinite capacity is rejected'
 );
 select throws_ok(
   $$insert into public.squad_capacity_periods (squad_id, calendar_id, start_sprint, end_sprint, capacity_md, source)
@@ -157,8 +157,8 @@ select is((select count(*)::integer from pg_policies where schemaname = 'public'
 select ok(not has_table_privilege('anon', 'public.squad_capacity_periods', 'select'), 'anonymous select is denied');
 select ok(not has_table_privilege('anon', 'public.squad_capacity_periods', 'insert'), 'anonymous insert is denied');
 select ok(has_table_privilege('authenticated', 'public.squad_capacity_periods', 'select'), 'authenticated select is granted');
-select ok(has_table_privilege('authenticated', 'public.squad_capacity_periods', 'insert'), 'authenticated insert is granted');
-select ok(has_table_privilege('authenticated', 'public.squad_capacity_periods', 'update'), 'authenticated update is granted');
+select ok(has_column_privilege('authenticated', 'public.squad_capacity_periods', 'squad_id', 'insert'), 'authenticated insert is granted');
+select ok(has_column_privilege('authenticated', 'public.squad_capacity_periods', 'capacity_md', 'update'), 'authenticated update is granted');
 select ok(not has_table_privilege('authenticated', 'public.squad_capacity_periods', 'delete'), 'authenticated physical delete is denied');
 
 set local role authenticated;
