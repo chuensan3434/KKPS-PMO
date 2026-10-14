@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EffortEstimation } from "@/features/planning/components/effort-estimation";
+import { CapacityPlanning } from "@/features/planning/components/capacity-planning";
 import { defaultPlanningState } from "@/features/planning/planning-data";
 import { getCapacityState, getOverCapacityCells, getPlanningSummary, getProjectsForSquadSprint } from "@/features/planning/decision-utils";
 import { defaultEstimationState } from "@/features/planning/estimation-data";
@@ -33,7 +34,7 @@ export default function PlanningPage() {
   const [dateError, setDateError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<"roadmap" | "estimation">("roadmap");
+  const [view, setView] = useState<"roadmap" | "estimation" | "capacity">("roadmap");
   const [estimation, setEstimation] = useState<EstimationState>(defaultEstimationState);
   const [estimationProjectId, setEstimationProjectId] = useState<string | null>(null);
   const [squadFilter, setSquadFilter] = useState("all");
@@ -106,9 +107,10 @@ export default function PlanningPage() {
     <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm" aria-label="Planning view">
       <button onClick={() => setView("roadmap")} aria-pressed={view === "roadmap"} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === "roadmap" ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Roadmap</button>
       <button onClick={() => setView("estimation")} aria-pressed={view === "estimation"} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === "estimation" ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Effort Estimation</button>
+      <button onClick={() => setView("capacity")} aria-pressed={view === "capacity"} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === "capacity" ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Capacity Periods</button>
     </div>
     {saveError && <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{saveError}</div>}
-    {view === "estimation" ? <EffortEstimation projects={state.projects} squads={state.squads} estimation={estimation} selectedProjectId={estimationProjectId} onSelectProject={setEstimationProjectId} onChange={changeEstimation} /> : <>
+    {view === "estimation" ? <EffortEstimation projects={state.projects} squads={state.squads} estimation={estimation} selectedProjectId={estimationProjectId} onSelectProject={setEstimationProjectId} onChange={changeEstimation} /> : view === "capacity" ? <CapacityPlanning planning={state} /> : <>
     <section aria-labelledby="configuration" className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-end gap-4"><div><h2 id="configuration" className="text-base font-semibold text-slate-950">Planning configuration</h2><p className="mt-1 text-sm text-slate-500">Each sprint is two working weeks (10 weekdays).</p></div><label className="ml-0 text-sm font-medium text-slate-700 sm:ml-auto">Planning year<input type="number" min="2020" max="2100" value={draftYear} onChange={(e) => setDraftYear(Number(e.target.value))} className="mt-1 block h-10 w-28 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /></label><label className="text-sm font-medium text-slate-700">Sprint 1 start (Monday)<input type="date" value={draftStart} onChange={(e) => setDraftStart(e.target.value)} aria-invalid={Boolean(dateError)} className="mt-1 block h-10 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /></label><button onClick={generate} className="h-10 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Generate / refresh</button></div>{dateError && <p role="alert" className="mt-3 text-sm font-medium text-red-700">{dateError}</p>}</section>
 
     <section aria-label="Planning decision summary" className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">{[

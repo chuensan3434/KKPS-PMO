@@ -58,3 +58,13 @@ test("moves, extends, and shrinks a scheduled bar on whole-sprint boundaries", a
   await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S5" })).toBeVisible();
   await expect(page.getByText(/120 MD · 1 Sprint/)).toBeVisible();
 });
+
+test("reuses the Projects session gate without changing legacy Roadmap storage", async ({ page }) => {
+  const before = await page.evaluate(() => localStorage.getItem("kkps-pmo:roadmap-planning:v1"));
+  await page.getByRole("button", { name: "Capacity Periods" }).click();
+  await expect(page.getByRole("heading", { name: "Supabase session required" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Projects to sign in" })).toHaveAttribute("href", "/projects");
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+  const after = await page.evaluate(() => localStorage.getItem("kkps-pmo:roadmap-planning:v1"));
+  expect(after).toBe(before);
+});

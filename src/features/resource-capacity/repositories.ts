@@ -13,6 +13,9 @@ import {
   squadAliasCreateSchema,
   squadAliasSchema,
   squadCreateSchema,
+  squadCapacityPeriodCreateSchema,
+  squadCapacityPeriodSchema,
+  squadCapacityPeriodUpdateSchema,
   squadMembershipCreateSchema,
   squadMembershipSchema,
   squadMembershipUpdateSchema,
@@ -280,6 +283,39 @@ export function createProjectSquadEffortRepository(client: RepositoryClient) {
       const { data, error } = await client.from("project_squad_efforts").update({ archived_at: null }).eq("id", validateId(operation, id)).select().single();
       databaseError(operation, error);
       return parseRow(operation, projectSquadEffortSchema, data);
+    },
+  };
+}
+
+export function createSquadCapacityPeriodRepository(client: RepositoryClient) {
+  return {
+    async list(calendarId?: string) {
+      const operation = "List capacity periods";
+      let query = client.from("squad_capacity_periods").select("*").order("start_sprint");
+      if (calendarId) query = query.eq("calendar_id", validateId(operation, calendarId));
+      const { data, error } = await query;
+      databaseError(operation, error);
+      return parseRows(operation, squadCapacityPeriodSchema, data);
+    },
+    async create(input: unknown) {
+      const operation = "Create capacity period";
+      const values = validateInput(operation, squadCapacityPeriodCreateSchema, input);
+      const { data, error } = await client.from("squad_capacity_periods").insert(values).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadCapacityPeriodSchema, data);
+    },
+    async update(id: string, input: unknown) {
+      const operation = "Update capacity period";
+      const values = validateInput(operation, squadCapacityPeriodUpdateSchema, input);
+      const { data, error } = await client.from("squad_capacity_periods").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadCapacityPeriodSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive capacity period";
+      const { data, error } = await client.from("squad_capacity_periods").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadCapacityPeriodSchema, data);
     },
   };
 }
