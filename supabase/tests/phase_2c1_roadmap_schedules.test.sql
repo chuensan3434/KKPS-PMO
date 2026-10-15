@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(16);
 
 select has_table('public', 'project_roadmap_schedules', 'Roadmap schedule table exists');
 select ok((select relrowsecurity from pg_class where oid = 'public.project_roadmap_schedules'::regclass), 'Roadmap schedules have RLS');

@@ -47,7 +47,7 @@ jobs:
           test -f supabase/tests/phase_2c_capacity_periods.test.sql
           test -f supabase/tests/phase_2c1_roadmap_schedules.test.sql
           grep -Fq "select plan(38);" supabase/tests/phase_2c_capacity_periods.test.sql
-          grep -Fq "select plan(15);" supabase/tests/phase_2c1_roadmap_schedules.test.sql
+          grep -Fq "select plan(16);" supabase/tests/phase_2c1_roadmap_schedules.test.sql
           npx supabase --version
 
       - name: Start an isolated local Supabase instance
