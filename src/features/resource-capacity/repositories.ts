@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { isLocalMockDataMode } from "../../lib/development-mode";
-import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockSprintRepository, createMockSquadRepository } from "./mock-repositories";
+import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockScheduleRepository, createMockSprintRepository, createMockSquadRepository } from "./mock-repositories";
 import {
   personCreateSchema,
   personSchema,
   personUpdateSchema,
   projectCreateSchema,
+  projectRoadmapScheduleCreateSchema,
+  projectRoadmapScheduleSchema,
+  projectRoadmapScheduleUpdateSchema,
   projectSchema,
   projectSquadEffortCreateSchema,
   projectSquadEffortSchema,
@@ -66,8 +69,8 @@ function databaseError(operation: string, error: { message: string; code?: strin
   if (error) throw new ResourceRepositoryError(operation, `${error.message}${error.code ? ` (${error.code})` : ""}`);
 }
 
-export function createSquadRepository(client: RepositoryClient) {
-  if (isLocalMockDataMode) return createMockSquadRepository();
+export function createSquadRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockSquadRepository();
   return {
     async list() {
       const operation = "List squads";
@@ -175,8 +178,8 @@ export function createMembershipRepository(client: RepositoryClient) {
   };
 }
 
-export function createSprintRepository(client: RepositoryClient) {
-  if (isLocalMockDataMode) return createMockSprintRepository();
+export function createSprintRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockSprintRepository();
   return {
     async listCalendars() {
       const operation = "List sprint calendars";
@@ -221,8 +224,8 @@ export function createSprintRepository(client: RepositoryClient) {
   };
 }
 
-export function createProjectRepository(client: RepositoryClient) {
-  if (isLocalMockDataMode) return createMockProjectRepository();
+export function createProjectRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockProjectRepository();
   return {
     async list() {
       const operation = "List projects";
@@ -253,8 +256,8 @@ export function createProjectRepository(client: RepositoryClient) {
   };
 }
 
-export function createProjectSquadEffortRepository(client: RepositoryClient) {
-  if (isLocalMockDataMode) return createMockEffortRepository();
+export function createProjectSquadEffortRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockEffortRepository();
   return {
     async list(projectId?: string) {
       const operation = "List project squad efforts";
@@ -293,8 +296,8 @@ export function createProjectSquadEffortRepository(client: RepositoryClient) {
   };
 }
 
-export function createSquadCapacityPeriodRepository(client: RepositoryClient) {
-  if (isLocalMockDataMode) return createMockCapacityRepository();
+export function createSquadCapacityPeriodRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockCapacityRepository();
   return {
     async list(calendarId?: string) {
       const operation = "List capacity periods";
@@ -323,6 +326,38 @@ export function createSquadCapacityPeriodRepository(client: RepositoryClient) {
       const { data, error } = await client.from("squad_capacity_periods").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
       databaseError(operation, error);
       return parseRow(operation, squadCapacityPeriodSchema, data);
+    },
+  };
+}
+
+export function createProjectRoadmapScheduleRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockScheduleRepository();
+  return {
+    async list(calendarId: string) {
+      const operation = "List project Roadmap schedules";
+      const { data, error } = await client.from("project_roadmap_schedules").select("*").eq("calendar_id", validateId(operation, calendarId)).order("created_at");
+      databaseError(operation, error);
+      return parseRows(operation, projectRoadmapScheduleSchema, data);
+    },
+    async create(input: unknown) {
+      const operation = "Create project Roadmap schedule";
+      const values = validateInput(operation, projectRoadmapScheduleCreateSchema, input);
+      const { data, error } = await client.from("project_roadmap_schedules").insert(values).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectRoadmapScheduleSchema, data);
+    },
+    async update(id: string, input: unknown) {
+      const operation = "Update project Roadmap schedule";
+      const values = validateInput(operation, projectRoadmapScheduleUpdateSchema, input);
+      const { data, error } = await client.from("project_roadmap_schedules").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectRoadmapScheduleSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive project Roadmap schedule";
+      const { data, error } = await client.from("project_roadmap_schedules").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectRoadmapScheduleSchema, data);
     },
   };
 }

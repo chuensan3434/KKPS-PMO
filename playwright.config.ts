@@ -1,11 +1,13 @@
 import { defineConfig } from "@playwright/test";
 
+const port = process.env.PLAYWRIGHT_PORT ?? "3000";
+
 export default defineConfig({
   testDir: "./tests/browser",
-  use: { baseURL: "http://127.0.0.1:3000", channel: "chromium", trace: "retain-on-failure" },
+  use: { baseURL: `http://127.0.0.1:${port}`, channel: "chromium", trace: "retain-on-failure" },
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1",
-    url: "http://127.0.0.1:3000/planning",
+    command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
+    url: `http://127.0.0.1:${port}/planning`,
     reuseExistingServer: !process.env.CI,
   },
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockSquadRepository } from "./mock-repositories";
+import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockScheduleRepository, createMockSquadRepository } from "./mock-repositories";
 
 beforeEach(() => window.localStorage.clear());
 
@@ -25,5 +25,14 @@ describe("local mock data repositories", () => {
     const updatedPeriod = await createMockCapacityRepository().update(period.id, { capacity_md: 30 });
     expect(updatedPeriod.capacity_md).toBe(30);
     expect((await createMockCapacityRepository().list())[0].id).toBe(period.id);
+  });
+
+  it("persists schedules separately without changing either legacy planning key", async () => {
+    localStorage.setItem("kkps-pmo:roadmap-planning:v1", "legacy-roadmap");
+    localStorage.setItem("kkps-pmo:effort-estimation:v1", "legacy-estimation");
+    const schedule = await createMockScheduleRepository().create({ project_id: "30000000-0000-4000-8000-000000000001", calendar_id: "10000000-0000-4000-8000-000000000001", start_sprint: 2, end_sprint: 4 });
+    expect(await createMockScheduleRepository().list(schedule.calendar_id)).toContainEqual(schedule);
+    expect(localStorage.getItem("kkps-pmo:roadmap-planning:v1")).toBe("legacy-roadmap");
+    expect(localStorage.getItem("kkps-pmo:effort-estimation:v1")).toBe("legacy-estimation");
   });
 });

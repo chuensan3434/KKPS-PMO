@@ -45,7 +45,9 @@ jobs:
           test -f supabase/tests/planning_foundation.test_test.sql
           test -f supabase/tests/phase_2b_effort_planning.test.sql
           test -f supabase/tests/phase_2c_capacity_periods.test.sql
+          test -f supabase/tests/phase_2c1_roadmap_schedules.test.sql
           grep -Fq "select plan(38);" supabase/tests/phase_2c_capacity_periods.test.sql
+          grep -Fq "select plan(15);" supabase/tests/phase_2c1_roadmap_schedules.test.sql
           npx supabase --version
 
       - name: Start an isolated local Supabase instance
@@ -56,12 +58,13 @@ jobs:
       - name: Apply all migrations to a clean local database
         run: npx supabase db reset --local --no-seed
 
-      - name: Run Phase 1, Phase 2B, and Phase 2C pgTAP suites
+      - name: Run Phase 1, Phase 2B, Phase 2C, and Phase 2C.1 pgTAP suites
         run: >-
           npx supabase test db --local
           supabase/tests/planning_foundation.test_test.sql
           supabase/tests/phase_2b_effort_planning.test.sql
           supabase/tests/phase_2c_capacity_periods.test.sql
+          supabase/tests/phase_2c1_roadmap_schedules.test.sql
 
       - name: Show local diagnostics after a failure
         if: failure()

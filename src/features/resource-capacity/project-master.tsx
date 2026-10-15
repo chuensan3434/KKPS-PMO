@@ -27,11 +27,11 @@ function statusLabel(status: Project["status"]) {
   return status.replace("_", " ");
 }
 
-export function ProjectMaster() {
+export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ mockMode?: boolean }>) {
   const supabase = useMemo(() => createClient(), []);
-  const repository = useMemo(() => createProjectRepository(supabase), [supabase]);
+  const repository = useMemo(() => createProjectRepository(supabase, mockMode), [mockMode, supabase]);
   const [session, setSession] = useState<Session | null>(null);
-  const [authLoading, setAuthLoading] = useState(!isLocalMockDataMode);
+  const [authLoading, setAuthLoading] = useState(!mockMode);
   const [authError, setAuthError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +47,7 @@ export function ProjectMaster() {
   const [workspaceView, setWorkspaceView] = useState<"projects" | "effort" | "squads">("effort");
 
   useEffect(() => {
-    if (isLocalMockDataMode) return;
+    if (mockMode) return;
     let mounted = true;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (mounted) {
@@ -67,10 +67,10 @@ export function ProjectMaster() {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [mockMode, supabase]);
 
   useEffect(() => {
-    if (!isLocalMockDataMode && !session) return;
+    if (!mockMode && !session) return;
 
     let current = true;
     async function loadProjects() {
@@ -91,7 +91,7 @@ export function ProjectMaster() {
     return () => {
       current = false;
     };
-  }, [repository, session]);
+  }, [mockMode, repository, session]);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -173,7 +173,7 @@ export function ProjectMaster() {
     return <PageContainer title="Projects" description="Loading your secure Project Master session…" />;
   }
 
-  if (!isLocalMockDataMode && !session) {
+  if (!mockMode && !session) {
     return (
       <PageContainer title="Projects" description="Sign in with your KKPS-PMO account to manage Project Master data.">
         <section className="mt-8 max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -199,9 +199,9 @@ export function ProjectMaster() {
   }
 
   return (
-    <PageContainer title="Project & Effort Planning" description={isLocalMockDataMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
+    <PageContainer title="Project & Effort Planning" description={mockMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {isLocalMockDataMode ? <p className="text-sm font-medium text-amber-800">Local Mock Data Mode — no Supabase records are read or changed.</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
+        {mockMode ? <p className="text-sm font-medium text-amber-800">Local Mock Data Mode — no Supabase records are read or changed.</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
       </div>
 
       <div role="tablist" aria-label="Project planning sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
@@ -214,8 +214,8 @@ export function ProjectMaster() {
         ))}
       </div>
 
-      {workspaceView === "effort" ? <div className="mt-6"><EffortPlanning /></div> : null}
-      {workspaceView === "squads" ? <div className="mt-6"><SquadManagement /></div> : null}
+      {workspaceView === "effort" ? <div className="mt-6"><EffortPlanning mockMode={mockMode} /></div> : null}
+      {workspaceView === "squads" ? <div className="mt-6"><SquadManagement mockMode={mockMode} /></div> : null}
       {workspaceView === "projects" ? <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <section aria-labelledby="project-list-heading" className="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">

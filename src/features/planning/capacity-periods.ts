@@ -52,9 +52,10 @@ export function capacityVsDemand(capacity: Array<number | null>, demand: number[
   return capacity.map((value, index) => ({ capacityMd: value, demandMd: demand[index] ?? 0, remainingMd: value === null ? null : value - (demand[index] ?? 0) }));
 }
 
+// Retained for an explicit future legacy-import workflow; normal Planning no longer uses mappings.
 export function assignUniqueMapping(mapping: Readonly<Record<string, string>>, legacyId: string, targetId: string) {
   if (targetId && Object.entries(mapping).some(([otherLegacyId, otherTargetId]) => otherLegacyId !== legacyId && otherTargetId === targetId)) {
-    return { mapping, error: "That Supabase record is already mapped to another legacy record." };
+    return { mapping, error: "That repository record is already mapped to another legacy record." };
   }
   return { mapping: { ...mapping, [legacyId]: targetId }, error: "" };
 }
