@@ -1,4 +1,5 @@
 import { Navigation } from "./navigation";
+import { DataModeBanner } from "./data-mode-banner";
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -9,7 +10,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         <header className="hidden h-16 items-center border-b border-slate-200 bg-white px-8 lg:flex">
           <p className="text-sm font-medium text-slate-500">Project Management Office</p>
         </header>
-        <main>{children}</main>
+        <main><DataModeBanner />{children}</main>
       </div>
     </div>
   );

@@ -15,9 +15,9 @@ function formatMd(value: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
-export function SquadManagement() {
+export function SquadManagement({ mockMode = false }: Readonly<{ mockMode?: boolean }>) {
   const client = useMemo(() => createClient(), []);
-  const repository = useMemo(() => createSquadRepository(client), [client]);
+  const repository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -139,11 +139,11 @@ export function SquadManagement() {
   );
 }
 
-export function EffortPlanning() {
+export function EffortPlanning({ mockMode = false }: Readonly<{ mockMode?: boolean }>) {
   const client = useMemo(() => createClient(), []);
-  const projectRepository = useMemo(() => createProjectRepository(client), [client]);
-  const squadRepository = useMemo(() => createSquadRepository(client), [client]);
-  const effortRepository = useMemo(() => createProjectSquadEffortRepository(client), [client]);
+  const projectRepository = useMemo(() => createProjectRepository(client, mockMode), [client, mockMode]);
+  const squadRepository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
+  const effortRepository = useMemo(() => createProjectSquadEffortRepository(client, mockMode), [client, mockMode]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [efforts, setEfforts] = useState<ProjectSquadEffort[]>([]);
