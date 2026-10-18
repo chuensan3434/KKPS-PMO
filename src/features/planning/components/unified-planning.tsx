@@ -2,9 +2,9 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import type { Project, ProjectRoadmapSchedule, ProjectSquadEffort, Sprint, SprintCalendar, Squad } from "@/features/resource-capacity/domain";
-import { createProjectRepository, createProjectRoadmapScheduleRepository, createProjectSquadEffortRepository, createSquadRepository, createSprintRepository } from "@/features/resource-capacity/repositories";
+import { createClient } from "../../../lib/supabase/client";
+import type { Project, ProjectRoadmapSchedule, ProjectSquadEffort, Sprint, SprintCalendar, Squad } from "../../resource-capacity/domain";
+import { createProjectRepository, createProjectRoadmapScheduleRepository, createProjectSquadEffortRepository, createSquadRepository, createSprintRepository } from "../../resource-capacity/repositories";
 import { loadSelectedCalendarId, saveSelectedCalendarId } from "../calendar-selection-storage";
 import { validateCalendarConfirmation } from "../capacity-periods";
 import { defaultEstimationState } from "../estimation-data";
@@ -19,7 +19,24 @@ import { CapacityPlanning } from "./capacity-planning";
 import { EffortEstimation } from "./effort-estimation";
 
 const sprintWidth = 112;
-const messageFrom = (error: unknown) => error instanceof Error ? error.message : "Something went wrong.";
+const requestTimeoutMs = 10_000;
+
+function messageFrom(error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : "Something went wrong.";
+  if (message.includes("PGRST205") || message.includes("42P01") || message.includes("project_roadmap_schedules")) {
+    return "Roadmap schedule storage is unavailable. Confirm that the Phase 2C.1 project_roadmap_schedules migration is applied to this Supabase environment.";
+  }
+  if (message.includes("401") || message.toLowerCase().includes("jwt")) return "Your Supabase session is no longer valid. Sign in again from Projects.";
+  if (message.includes("403") || message.toLowerCase().includes("permission denied")) return "Your Supabase session does not have permission to load Planning data.";
+  return message;
+}
+
+function withTimeout<T>(request: Promise<T>, label: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(`${label} timed out. Check the network connection and try again.`)), requestTimeoutMs);
+    request.then(resolve, reject).finally(() => window.clearTimeout(timeout));
+  });
+}
 
 export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   const client = useMemo(() => createClient(), []);
@@ -39,6 +56,10 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   const [schedules, setSchedules] = useState<ProjectRoadmapSchedule[]>([]);
   const [view, setView] = useState<"roadmap" | "estimation" | "capacity">("roadmap");
   const [loading, setLoading] = useState(!mockMode);
+  const [authAttempt, setAuthAttempt] = useState(0);
+  const [dataAttempt, setDataAttempt] = useState(0);
+  const [calendarAttempt, setCalendarAttempt] = useState(0);
+  const [errorScope, setErrorScope] = useState<"data" | "calendar">("data");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,10 +73,16 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   useEffect(() => {
     if (mockMode) return;
     let mounted = true;
-    const { data: listener } = client.auth.onAuthStateChange((_event, next) => { if (mounted) { setSession(next); setAccessReady(true); } });
-    void client.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setAccessReady(true); } });
+    const { data: listener } = client.auth.onAuthStateChange((_event, next) => { if (mounted) { setSession(next); setAccessReady(true); if (!next) setLoading(false); } });
+    void withTimeout(client.auth.getSession(), "Supabase authentication")
+      .then(({ data, error: authError }) => {
+        if (authError) throw authError;
+        if (mounted) setSession(data.session);
+      })
+      .catch((caught) => { if (mounted) { setSession(null); setError(messageFrom(caught)); } })
+      .finally(() => { if (mounted) { setAccessReady(true); setLoading(false); } });
     return () => { mounted = false; listener.subscription.unsubscribe(); };
-  }, [client, mockMode]);
+  }, [authAttempt, client, mockMode]);
 
   useEffect(() => {
     if (!accessReady || (!mockMode && !session)) return;
@@ -63,9 +90,9 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     async function loadRepositoryData() {
       await Promise.resolve();
       if (!current) return;
-      setLoading(true); setError("");
+      setLoading(true); setError(""); setErrorScope("data");
       try {
-        const [nextProjects, nextSquads, nextEfforts, nextCalendars] = await Promise.all([projectRepository.list(), squadRepository.list(), effortRepository.list(), sprintRepository.listCalendars()]);
+        const [nextProjects, nextSquads, nextEfforts, nextCalendars] = await withTimeout(Promise.all([projectRepository.list(), squadRepository.list(), effortRepository.list(), sprintRepository.listCalendars()]), "Loading Planning data");
         if (!current) return;
         setProjects(nextProjects); setSquads(nextSquads); setEfforts(nextEfforts); setCalendars(nextCalendars.filter((calendar) => calendar.active));
         const stored = loadSelectedCalendarId();
@@ -75,7 +102,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     }
     void loadRepositoryData();
     return () => { current = false; };
-  }, [accessReady, effortRepository, mockMode, projectRepository, session, sprintRepository, squadRepository]);
+  }, [accessReady, dataAttempt, effortRepository, mockMode, projectRepository, session, sprintRepository, squadRepository]);
 
   useEffect(() => {
     if (!calendarId) return;
@@ -84,9 +111,9 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     async function loadCalendarData() {
       await Promise.resolve();
       if (!current) return;
-      setLoading(true); setError("");
+      setLoading(true); setError(""); setErrorScope("calendar");
       try {
-        const [nextSprints, nextSchedules] = await Promise.all([sprintRepository.listSprints(calendarId), scheduleRepository.list(calendarId)]);
+        const [nextSprints, nextSchedules] = await withTimeout(Promise.all([sprintRepository.listSprints(calendarId), scheduleRepository.list(calendarId)]), "Loading the selected Sprint calendar");
         if (!current || !calendar) return;
         const expected = generateSprints(Number(calendar.baseline_start_date.slice(0, 4)), calendar.baseline_start_date);
         const validation = validateCalendarConfirmation(calendar, nextSprints, expected);
@@ -97,7 +124,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     }
     void loadCalendarData();
     return () => { current = false; };
-  }, [calendarId, calendars, scheduleRepository, sprintRepository]);
+  }, [calendarAttempt, calendarId, calendars, scheduleRepository, sprintRepository]);
 
   const planning = useMemo(() => buildUnifiedPlanningState(projects, squads, efforts, schedules, sprints), [efforts, projects, schedules, sprints, squads]);
   const backlog = planning.projects.filter((project) => project.status === "unscheduled");
@@ -119,7 +146,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
       const saved = existing ? await scheduleRepository.update(existing.id, { start_sprint, end_sprint }) : await scheduleRepository.create({ project_id: project.id, calendar_id: calendarId, start_sprint, end_sprint });
       setSchedules((current) => existing ? current.map((item) => item.id === saved.id ? saved : item) : [...current, saved]);
       setSelectedId(project.id);
-    } catch (caught) { setError(messageFrom(caught)); } finally { setSaving(false); }
+    } catch (caught) { setErrorScope("calendar"); setError(messageFrom(caught)); } finally { setSaving(false); }
   }
 
   async function schedule(project: PlanningProject, start: number) { const next = scheduleProject(project, start, sprints.length); await persistRange(project, next.scheduledStartSprint!, next.scheduledEndSprint!); }
@@ -128,19 +155,19 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     if (!existing) return;
     setSaving(true); setError("");
     try { const archived = await scheduleRepository.archive(existing.id); setSchedules((current) => current.map((item) => item.id === archived.id ? archived : item)); setSelectedId(null); }
-    catch (caught) { setError(messageFrom(caught)); } finally { setSaving(false); }
+    catch (caught) { setErrorScope("calendar"); setError(messageFrom(caught)); } finally { setSaving(false); }
   }
   function sprintFromPointer(clientX: number) { const rect = timelineBodyRef.current?.getBoundingClientRect(); return rect ? Math.max(1, Math.min(sprints.length, Math.floor((clientX - rect.left) / sprintWidth) + 1)) : null; }
   async function dropOnSprint(event: React.DragEvent, sprint: number) { event.preventDefault(); event.stopPropagation(); const resizeId = event.dataTransfer.getData("text/resize-project-id"); const moveId = event.dataTransfer.getData("text/project-id"); const project = planning.projects.find((item) => item.id === (resizeId || moveId)); if (!project) return; const range = resizeId ? resizeProjectSchedule(project, sprint, sprints.length) : project.status === "scheduled" ? moveProjectSchedule(project, sprint, sprints.length) : scheduleProject(project, sprint, sprints.length); await persistRange(project, range.scheduledStartSprint!, range.scheduledEndSprint!); setDraggingId(null); setResizingId(null); setDropSprint(null); }
 
   function changeLegacyEstimation(next: EstimationState) { setLegacyEstimation(next); saveEstimationState(next); }
 
-  if (loading && projects.length === 0) return <div className="px-4 py-12 text-sm text-slate-500">Loading unified planning workspace…</div>;
-  if (!mockMode && accessReady && !session) return <div className="px-4 py-12"><h1 className="text-2xl font-bold">Supabase session required</h1><p className="mt-2 text-slate-600">Sign in from Projects before opening unified Planning.</p></div>;
+  if (loading && projects.length === 0 && !error) return <div className="px-4 py-12 text-sm text-slate-500">Loading unified planning workspace…</div>;
+  if (!mockMode && accessReady && !session) return <div className="px-4 py-12"><h1 className="text-2xl font-bold">Supabase session required</h1><p role="alert" className="mt-2 text-slate-600">{error || "Sign in from Projects before opening unified Planning."}</p><button onClick={() => { setError(""); setAccessReady(false); setLoading(true); setAuthAttempt((current) => current + 1); }} className="mt-4 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700">Retry authentication</button></div>;
 
   return <div className="w-full px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
     <header className="border-b border-slate-200 pb-6"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">KKPS PMO</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Roadmap Planning</h1><p className="mt-3 text-base text-slate-600">Repository Projects, Squads, Effort, schedules, and Capacity Periods share stable identities.</p></header>
-    {error && <p role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+    {error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="mr-auto">{error}</span><button onClick={() => { setError(""); if (errorScope === "calendar") setCalendarAttempt((current) => current + 1); else setDataAttempt((current) => current + 1); }} className="rounded-md border border-red-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
     <section className="mt-6 flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mr-auto"><h2 className="font-semibold text-slate-950">Planning calendar</h2><p className="mt-1 text-xs text-slate-500">The selected calendar is shared by Roadmap and Capacity Periods.</p></div><label className="text-sm font-medium text-slate-700">Sprint calendar<select aria-label="Sprint calendar" value={calendarId} onChange={(event) => void selectCalendar(event.target.value)} className="mt-1 block h-10 min-w-56 rounded-lg border border-slate-300 px-3"><option value="">Select a calendar</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.display_name} · {calendar.baseline_start_date}</option>)}</select></label>{calendarId && sprints.length > 0 && <p className="text-sm font-semibold text-emerald-700">Compatible · {sprints.length} Sprints</p>}</section>
     <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">{(["roadmap", "estimation", "capacity"] as const).map((tab) => <button key={tab} onClick={() => setView(tab)} aria-pressed={view === tab} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === tab ? "bg-blue-700 text-white" : "text-slate-600"}`}>{tab === "roadmap" ? "Roadmap" : tab === "estimation" ? "Effort Estimation" : "Capacity Periods"}</button>)}</div>
     {view === "estimation" && <div className="mt-6"><p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Legacy estimation is kept separate and does not contribute to unified Roadmap demand.</p><EffortEstimation projects={legacyPlanning.projects} squads={legacyPlanning.squads} estimation={legacyEstimation} selectedProjectId={null} onSelectProject={() => undefined} onChange={changeLegacyEstimation} /></div>}
