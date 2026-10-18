@@ -69,12 +69,12 @@ export const sprintCalendarSchema = z.object({
   code: nonBlank(80),
   display_name: nonBlank(160),
   baseline_start_date: isoDate,
-  cadence_days: z.literal(14),
+  cadence_days: z.number().int().min(7).max(28),
   active: z.boolean(),
   created_at: timestamp,
   updated_at: timestamp,
 });
-export const sprintCalendarCreateSchema = sprintCalendarSchema.omit({ id: true, created_at: true, updated_at: true, cadence_days: true });
+export const sprintCalendarCreateSchema = sprintCalendarSchema.omit({ id: true, created_at: true, updated_at: true }).extend({ cadence_days: z.number().int().min(7).max(28).default(14) });
 export const sprintCalendarUpdateSchema = sprintCalendarCreateSchema.partial().refine((value) => Object.keys(value).length > 0, "Provide at least one calendar change.");
 
 export const sprintSchema = z.object({

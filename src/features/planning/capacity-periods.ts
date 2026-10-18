@@ -63,6 +63,19 @@ export function assignUniqueMapping(mapping: Readonly<Record<string, string>>, l
 type CalendarCandidate = { baseline_start_date: string; cadence_days: number };
 type SprintCandidate = { sequence_number: number; start_date: string; display_end_date: string; coverage_end_date: string };
 
+export function validateSharedSprintCalendar(calendar: CalendarCandidate, candidateSprints: SprintCandidate[]) {
+  if (candidateSprints.length === 0) return "Calendar has no Sprints.";
+  if (calendar.baseline_start_date !== candidateSprints[0].start_date) return "Calendar start date does not match Sprint 1.";
+  if (!Number.isInteger(calendar.cadence_days) || calendar.cadence_days < 7 || calendar.cadence_days > 28) return "Calendar cadence must be 1–4 weeks.";
+  for (let index = 0; index < candidateSprints.length; index += 1) {
+    const sprint = candidateSprints[index];
+    if (sprint.sequence_number !== index + 1) return "Calendar Sprint sequence must be contiguous from S1.";
+    if (sprint.display_end_date < sprint.start_date || sprint.coverage_end_date < sprint.display_end_date) return `Calendar Sprint dates are invalid at S${index + 1}.`;
+    if (index > 0 && sprint.start_date <= candidateSprints[index - 1].coverage_end_date) return `Calendar S${index + 1} overlaps the previous Sprint.`;
+  }
+  return "";
+}
+
 export function validateCalendarConfirmation(calendar: CalendarCandidate, candidateSprints: SprintCandidate[], roadmapSprints: Sprint[]) {
   if (calendar.baseline_start_date !== roadmapSprints[0]?.start) return "Calendar start date does not match the Roadmap Sprint 1 start date.";
   if (calendar.cadence_days !== 14) return "Calendar cadence must be 14 days.";

@@ -6,17 +6,18 @@ import { createClient } from "../../../lib/supabase/client";
 import type { Project, ProjectRoadmapSchedule, ProjectSquadEffort, Sprint, SprintCalendar, Squad } from "../../resource-capacity/domain";
 import { createProjectRepository, createProjectRoadmapScheduleRepository, createProjectSquadEffortRepository, createSquadRepository, createSprintRepository } from "../../resource-capacity/repositories";
 import { loadSelectedCalendarId, saveSelectedCalendarId } from "../calendar-selection-storage";
-import { validateCalendarConfirmation } from "../capacity-periods";
+import { validateSharedSprintCalendar } from "../capacity-periods";
 import { defaultEstimationState } from "../estimation-data";
 import { loadEstimationState, saveEstimationState } from "../estimation-storage";
 import { loadPlanningState } from "../planning-storage";
 import { scheduleProject, setProjectEndSprint, setProjectStartSprint } from "../roadmap-actions";
-import { formatSprintRange, generateSprints } from "../planning-utils";
+import { formatSprintRange } from "../planning-utils";
 import { getSprintDuration, moveProjectSchedule, packProjectsIntoLanes, resizeProjectSchedule } from "../timeline-utils";
 import type { EstimationState, PlanningProject } from "../types";
 import { buildUnifiedPlanningState } from "../unified-planning";
 import { CapacityPlanning } from "./capacity-planning";
 import { EffortEstimation } from "./effort-estimation";
+import { SprintCalendarSetup } from "./sprint-calendar-setup";
 
 const sprintWidth = 112;
 const requestTimeoutMs = 10_000;
@@ -116,8 +117,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
       try {
         const [nextSprints, nextSchedules] = await withTimeout(Promise.all([sprintRepository.listSprints(calendarId), scheduleRepository.list(calendarId)]), "Loading the selected Sprint calendar");
         if (!current || !calendar) return;
-        const expected = generateSprints(Number(calendar.baseline_start_date.slice(0, 4)), calendar.baseline_start_date);
-        const validation = validateCalendarConfirmation(calendar, nextSprints, expected);
+        const validation = validateSharedSprintCalendar(calendar, nextSprints);
         if (validation) throw new Error(validation);
         setSprints(nextSprints); setSchedules(nextSchedules); saveSelectedCalendarId(calendarId);
       } catch (caught) { if (current) { setSprints([]); setSchedules([]); setError(messageFrom(caught)); } }
@@ -170,7 +170,8 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     <header className="border-b border-slate-200 pb-6"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">KKPS PMO</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Roadmap Planning</h1><p className="mt-3 text-base text-slate-600">Repository Projects, Squads, Effort, schedules, and Capacity Periods share stable identities.</p></header>
     {error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="mr-auto">{error}</span><button onClick={() => { setError(""); if (errorScope === "calendar") setCalendarAttempt((current) => current + 1); else setDataAttempt((current) => current + 1); }} className="rounded-md border border-red-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
     <section className="mt-6 flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mr-auto"><h2 className="font-semibold text-slate-950">Planning calendar</h2><p className="mt-1 text-xs text-slate-500">The selected calendar is shared by Roadmap and Capacity Periods.</p></div><label className="text-sm font-medium text-slate-700">Sprint calendar<select aria-label="Sprint calendar" value={calendarId} onChange={(event) => void selectCalendar(event.target.value)} className="mt-1 block h-10 min-w-56 rounded-lg border border-slate-300 px-3"><option value="">Select a calendar</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.display_name} · {calendar.baseline_start_date}</option>)}</select></label>{calendarId && sprints.length > 0 && <p className="text-sm font-semibold text-emerald-700">Compatible · {sprints.length} Sprints</p>}</section>
-    <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">{(["roadmap", "estimation", "capacity"] as const).map((tab) => <button key={tab} onClick={() => setView(tab)} aria-pressed={view === tab} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === tab ? "bg-blue-700 text-white" : "text-slate-600"}`}>{tab === "roadmap" ? "Roadmap" : tab === "estimation" ? "Effort Estimation" : "Capacity Periods"}</button>)}</div>
+    {view === "roadmap" && <SprintCalendarSetup repository={sprintRepository} schedules={schedules.filter((item) => item.archived_at === null).length} capacityPeriods={0} onCreated={(calendar, createdSprints) => { setCalendars((value) => [...value, calendar]); setCalendarId(calendar.id); setSprints(createdSprints); setSchedules([]); }} />}
+    <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">{(["roadmap", "estimation", "capacity"] as const).map((tab) => <button key={tab} onClick={() => setView(tab)} aria-pressed={view === tab} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === tab ? "bg-blue-700 text-white" : "text-slate-600"}`}>{tab === "roadmap" ? "Roadmap" : tab === "estimation" ? "Effort Estimation" : "Squad Capacity Planner"}</button>)}</div>
     {view === "estimation" && <div className="mt-6"><p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Legacy estimation is kept separate and does not contribute to unified Roadmap demand.</p><EffortEstimation projects={legacyPlanning.projects} squads={legacyPlanning.squads} estimation={legacyEstimation} selectedProjectId={null} onSelectProject={() => undefined} onChange={changeLegacyEstimation} /></div>}
     {view === "capacity" && <CapacityPlanning planning={planning} calendarId={calendarId} mockMode={mockMode} />}
     {view === "roadmap" && <>

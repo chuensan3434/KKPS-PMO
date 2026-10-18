@@ -56,7 +56,54 @@ test("a newly created Project appears once in the Roadmap backlog", async ({ pag
 });
 
 test("Capacity Periods shares the calendar and has no identity mapping UI", async ({ page }) => {
-  await page.getByRole("button", { name: "Capacity Periods" }).click();
+  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
   await expect(page.getByText(/identity mapping/i)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add period" })).toBeEnabled();
+});
+
+test("completes planner interactions and persists them in Demo Mode", async ({ page }) => {
+  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
+  await page.getByLabel("New member name").fill("Demo Member");
+  await page.getByRole("button", { name: "Add", exact: true }).first().click();
+  await page.getByLabel("Demo Member default availability").fill("80");
+  await page.getByText("Per-Sprint overrides").click();
+  await page.getByLabel("Demo Member S1 availability").fill("60");
+  await page.getByLabel("Move Dev down").click();
+  await page.getByLabel("Row employee").selectOption({ label: "Demo Member" });
+  await page.getByLabel("Row work type").selectOption({ label: "Dev" });
+  await page.getByRole("button", { name: "Add Row" }).click();
+  await page.getByLabel("Demo Member Dev S1", { exact: true }).fill("60");
+  await page.getByLabel("Row work type").selectOption({ label: "SA" });
+  await page.getByRole("button", { name: "Add Row" }).click();
+  await page.getByLabel("Demo Member SA S1", { exact: true }).fill("50");
+  await expect(page.getByRole("row", { name: /Total allocated 110%/ })).toBeVisible();
+  await page.getByRole("button", { name: "Copy" }).first().click();
+  await page.getByLabel("Copy source Sprint").selectOption({ label: "S1" });
+  await page.getByLabel("Copy destination start").fill("2");
+  await page.getByLabel("Copy destination end").fill("3");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Apply copy" }).click();
+  await expect(page.getByLabel("Demo Member Dev S3", { exact: true })).toHaveValue("60");
+  await page.getByRole("img", { name: /100% stacked area chart/ }).getByText("S1", { exact: true }).click();
+  await expect(page.getByLabel("Demo Member Dev S1", { exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-blue-50/);
+  await page.reload();
+  await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
+  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await expect(page.getByLabel("Demo Member Dev S3", { exact: true })).toHaveValue("60");
+  await expect(page.getByRole("heading", { name: "Manage Capacity Periods" })).toBeVisible();
+});
+
+test("previews individual Sprint adjustment and creates a separate calendar version", async ({ page }) => {
+  await page.getByRole("button", { name: "Sprint Calendar Setup" }).click();
+  await page.getByLabel("Sprint count").fill("3");
+  await page.getByLabel("S2 start").fill("2027-01-16");
+  await expect(page.getByText(/S2 overlaps the previous Sprint/)).toBeVisible();
+  await page.getByLabel("S2 start").fill("2027-01-20");
+  await page.getByLabel("S2 end").fill("2027-01-31");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Confirm and create calendar version" }).click();
+  await expect(page.getByText("Compatible · 3 Sprints")).toBeVisible();
+  await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
+  await expect(page.getByText("Compatible · 26 Sprints")).toBeVisible();
 });

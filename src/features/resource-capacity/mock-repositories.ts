@@ -1,4 +1,4 @@
-import { projectCreateSchema, projectRoadmapScheduleCreateSchema, projectRoadmapScheduleUpdateSchema, projectSquadEffortCreateSchema, projectSquadEffortUpdateSchema, projectUpdateSchema, squadCapacityPeriodCreateSchema, squadCapacityPeriodUpdateSchema, squadCreateSchema, squadUpdateSchema, type Project, type ProjectRoadmapSchedule, type ProjectSquadEffort, type Sprint, type SprintCalendar, type Squad, type SquadCapacityPeriod } from "./domain";
+import { projectCreateSchema, projectRoadmapScheduleCreateSchema, projectRoadmapScheduleUpdateSchema, projectSquadEffortCreateSchema, projectSquadEffortUpdateSchema, projectUpdateSchema, squadCapacityPeriodCreateSchema, squadCapacityPeriodUpdateSchema, squadCreateSchema, squadUpdateSchema, sprintCalendarCreateSchema, sprintCalendarUpdateSchema, sprintCreateSchema, sprintUpdateSchema, type Project, type ProjectRoadmapSchedule, type ProjectSquadEffort, type Sprint, type SprintCalendar, type Squad, type SquadCapacityPeriod } from "./domain";
 
 const storageKey = "kkps-pmo:local-mock-data:v1";
 const calendarId = "10000000-0000-4000-8000-000000000001";
@@ -49,7 +49,14 @@ export function createMockEffortRepository() { return {
   async archive(recordId: string) { return effortArchive(recordId, now()); }, async restore(recordId: string) { return effortArchive(recordId, null); },
 }; }
 
-export function createMockSprintRepository() { return { async listCalendars() { return read().calendars; }, async listSprints(id: string) { return read().sprints.filter((r) => r.calendar_id === id); } }; }
+export function createMockSprintRepository() { return {
+  async listCalendars() { return read().calendars; },
+  async createCalendar(input: unknown) { const values = sprintCalendarCreateSchema.parse(input); const record = { id: uuid(), ...values, created_at: now(), updated_at: now() }; change((store) => { store.calendars.push(record); }); return record; },
+  async updateCalendar(recordId: string, input: unknown) { const values = sprintCalendarUpdateSchema.parse(input); let result!: SprintCalendar; change((store) => { store.calendars = store.calendars.map((record) => record.id === recordId ? (result = { ...record, ...values, updated_at: now() }) : record); }); return result; },
+  async listSprints(id: string) { return read().sprints.filter((r) => r.calendar_id === id).toSorted((a, b) => a.sequence_number - b.sequence_number); },
+  async createSprint(input: unknown) { const values = sprintCreateSchema.parse(input); const record = { id: uuid(), ...values, created_at: now(), updated_at: now() }; change((store) => { store.sprints.push(record); }); return record; },
+  async updateSprint(recordId: string, input: unknown) { const values = sprintUpdateSchema.parse(input); let result!: Sprint; change((store) => { store.sprints = store.sprints.map((record) => record.id === recordId ? (result = { ...record, ...values, updated_at: now() }) : record); }); return result; },
+}; }
 export function createMockCapacityRepository() { return {
   async list(id?: string) { return read().periods.filter((r) => !id || r.calendar_id === id); },
   async create(input: unknown) { const values = squadCapacityPeriodCreateSchema.parse(input); const record = { id: uuid(), ...values, archived_at: null, created_at: now(), updated_at: now() }; change((s) => { s.periods.push(record); }); return record; },
