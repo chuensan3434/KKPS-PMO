@@ -35,6 +35,7 @@ import {
 } from "./domain";
 
 type RepositoryClient = SupabaseClient;
+type MockableRepositoryClient = SupabaseClient | null;
 
 export class ResourceRepositoryError extends Error {
   constructor(operation: string, detail: string) {
@@ -69,8 +70,9 @@ function databaseError(operation: string, error: { message: string; code?: strin
   if (error) throw new ResourceRepositoryError(operation, `${error.message}${error.code ? ` (${error.code})` : ""}`);
 }
 
-export function createSquadRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+export function createSquadRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
   if (useMock) return createMockSquadRepository();
+  if (!client) throw new ResourceRepositoryError("Create squad repository", "Supabase client is required outside Demo Mode.");
   return {
     async list() {
       const operation = "List squads";
@@ -178,8 +180,9 @@ export function createMembershipRepository(client: RepositoryClient) {
   };
 }
 
-export function createSprintRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+export function createSprintRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
   if (useMock) return createMockSprintRepository();
+  if (!client) throw new ResourceRepositoryError("Create sprint repository", "Supabase client is required outside Demo Mode.");
   return {
     async listCalendars() {
       const operation = "List sprint calendars";
@@ -224,8 +227,9 @@ export function createSprintRepository(client: RepositoryClient, useMock = isLoc
   };
 }
 
-export function createProjectRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+export function createProjectRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
   if (useMock) return createMockProjectRepository();
+  if (!client) throw new ResourceRepositoryError("Create project repository", "Supabase client is required outside Demo Mode.");
   return {
     async list() {
       const operation = "List projects";
@@ -256,8 +260,9 @@ export function createProjectRepository(client: RepositoryClient, useMock = isLo
   };
 }
 
-export function createProjectSquadEffortRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+export function createProjectSquadEffortRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
   if (useMock) return createMockEffortRepository();
+  if (!client) throw new ResourceRepositoryError("Create effort repository", "Supabase client is required outside Demo Mode.");
   return {
     async list(projectId?: string) {
       const operation = "List project squad efforts";
@@ -296,8 +301,9 @@ export function createProjectSquadEffortRepository(client: RepositoryClient, use
   };
 }
 
-export function createSquadCapacityPeriodRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+export function createSquadCapacityPeriodRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
   if (useMock) return createMockCapacityRepository();
+  if (!client) throw new ResourceRepositoryError("Create capacity repository", "Supabase client is required outside Demo Mode.");
   return {
     async list(calendarId?: string) {
       const operation = "List capacity periods";
@@ -330,8 +336,9 @@ export function createSquadCapacityPeriodRepository(client: RepositoryClient, us
   };
 }
 
-export function createProjectRoadmapScheduleRepository(client: RepositoryClient, useMock = isLocalMockDataMode) {
+export function createProjectRoadmapScheduleRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
   if (useMock) return createMockScheduleRepository();
+  if (!client) throw new ResourceRepositoryError("Create Roadmap repository", "Supabase client is required outside Demo Mode.");
   return {
     async list(calendarId: string) {
       const operation = "List project Roadmap schedules";

@@ -49,13 +49,12 @@ beforeEach(() => {
 });
 
 describe("unified Capacity Planning", () => {
-  it("uses the shared calendar and stable squad IDs without identity mapping", async () => {
+  it("uses the shared calendar and stable squad IDs without identity mapping UI", async () => {
     const user = userEvent.setup();
     const planning = { ...defaultPlanningState, squads: [{ id: squadId, name: "Supabase Squad", capacityMd: 0 }], projects: [] };
     render(<CapacityPlanning planning={planning} calendarId={calendarId} />);
 
-    expect(await screen.findByText(/No identity mapping is required/)).toBeVisible();
-    expect(screen.queryByText(/Identity mapping review/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/identity mapping/i)).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Add period" })).toBeEnabled());
     await user.selectOptions(screen.getByLabelText("Start Sprint"), "1");
     await user.selectOptions(screen.getByLabelText("End Sprint"), "2");

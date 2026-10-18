@@ -27,6 +27,12 @@ Required variables:
 
 Never place a Supabase secret or legacy service-role key in a `NEXT_PUBLIC_` variable.
 
+## Demo Mode
+
+Local development uses the existing browser-local mock repositories when `NEXT_PUBLIC_LOCAL_MOCK_DATA=true`. To enable the same Demo Mode on Vercel Preview deployments, set `NEXT_PUBLIC_DEMO_MODE=true` only for the Preview environment. The preview gate also requires Vercel's server-side `VERCEL_ENV=preview`; Production always uses authenticated Supabase Mode even if the public flag is mistakenly present.
+
+Demo data is stored under `kkps-pmo:local-mock-data:v1` in the current browser. It is not shared between users or devices, is not synchronized to Supabase, and may be lost when browser storage is cleared. Existing stored mock data and unrelated legacy localStorage keys are left unchanged. To disable Demo Mode later, remove or set the applicable demo variable to `false`; no authentication code or database policy needs to change.
+
 ## Development
 
 ```bash

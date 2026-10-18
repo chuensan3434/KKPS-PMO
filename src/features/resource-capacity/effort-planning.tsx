@@ -16,7 +16,7 @@ function formatMd(value: number) {
 }
 
 export function SquadManagement({ mockMode = false }: Readonly<{ mockMode?: boolean }>) {
-  const client = useMemo(() => createClient(), []);
+  const client = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const repository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +140,7 @@ export function SquadManagement({ mockMode = false }: Readonly<{ mockMode?: bool
 }
 
 export function EffortPlanning({ mockMode = false }: Readonly<{ mockMode?: boolean }>) {
-  const client = useMemo(() => createClient(), []);
+  const client = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const projectRepository = useMemo(() => createProjectRepository(client, mockMode), [client, mockMode]);
   const squadRepository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
   const effortRepository = useMemo(() => createProjectSquadEffortRepository(client, mockMode), [client, mockMode]);

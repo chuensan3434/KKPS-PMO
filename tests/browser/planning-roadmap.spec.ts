@@ -57,7 +57,6 @@ test("a newly created Project appears once in the Roadmap backlog", async ({ pag
 
 test("Capacity Periods shares the calendar and has no identity mapping UI", async ({ page }) => {
   await page.getByRole("button", { name: "Capacity Periods" }).click();
-  await expect(page.getByText(/No identity mapping is required/)).toBeVisible();
-  await expect(page.getByText("Identity mapping review")).toHaveCount(0);
+  await expect(page.getByText(/identity mapping/i)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add period" })).toBeEnabled();
 });

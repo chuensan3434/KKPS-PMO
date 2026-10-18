@@ -18,7 +18,7 @@ const emptyForm: PeriodForm = { squadId: "", startSprint: 1, endSprint: 1, capac
 function messageFrom(error: unknown) { return error instanceof Error ? error.message : "Something went wrong."; }
 
 export function CapacityPlanning({ planning, calendarId = "", mockMode = isLocalMockDataMode }: Readonly<{ planning: PlanningState; calendarId?: string; mockMode?: boolean }>) {
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const capacityRepository = useMemo(() => createSquadCapacityPeriodRepository(supabase, mockMode), [mockMode, supabase]);
   const squadRepository = useMemo(() => createSquadRepository(supabase, mockMode), [mockMode, supabase]);
   const sprintRepository = useMemo(() => createSprintRepository(supabase, mockMode), [mockMode, supabase]);
@@ -36,6 +36,7 @@ export function CapacityPlanning({ planning, calendarId = "", mockMode = isLocal
 
   useEffect(() => {
     if (mockMode) return;
+    if (!supabase) return;
     let mounted = true;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => { if (mounted) { setSession(next); setAuthReady(true); } });
     void supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setAuthReady(true); } });
@@ -120,10 +121,6 @@ export function CapacityPlanning({ planning, calendarId = "", mockMode = isLocal
 
   return <div className="mt-6 space-y-6">
     {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="font-semibold text-slate-950">Unified planning identities</h2><p className="mt-1 text-sm text-slate-600">Roadmap demand and Capacity Periods use the same Project, Squad, and calendar IDs. No identity mapping is required.</p>
-    </section>
-
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><h2 className="font-semibold text-slate-950">Manage Capacity Periods</h2><p className="mt-1 text-sm text-slate-500">Start and End Sprint are inclusive. Zero MD is valid.</p></div><label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />Show archived</label></div>
       {!calendarId && <p className="border-b border-slate-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">Select and confirm a compatible Sprint calendar before managing Capacity Periods.</p>}
       <form onSubmit={savePeriod} className="grid gap-4 border-b border-slate-200 p-5 sm:grid-cols-2 lg:grid-cols-6 lg:items-end"><label className="text-sm font-medium text-slate-700 lg:col-span-2">Squad<select disabled={Boolean(editingId) || !calendarId} value={form.squadId} onChange={(event) => setForm((current) => ({ ...current, squadId: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3"><option value="">Choose squad</option>{squads.filter((squad) => squad.active).map((squad) => <option key={squad.id} value={squad.id}>{squad.display_name}</option>)}</select></label><label className="text-sm font-medium text-slate-700">Start Sprint<select disabled={!calendarId} value={form.startSprint} onChange={(event) => setForm((current) => ({ ...current, startSprint: Number(event.target.value) }))} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3">{sprints.map((sprint) => <option key={sprint.id} value={sprint.sequence_number}>S{sprint.sequence_number}</option>)}</select></label><label className="text-sm font-medium text-slate-700">End Sprint<select disabled={!calendarId} value={form.endSprint} onChange={(event) => setForm((current) => ({ ...current, endSprint: Number(event.target.value) }))} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3">{sprints.map((sprint) => <option key={sprint.id} value={sprint.sequence_number}>S{sprint.sequence_number}</option>)}</select></label><label className="text-sm font-medium text-slate-700">MD per Sprint<input disabled={!calendarId} aria-label="MD per Sprint" type="number" min="0" step="0.5" required value={form.capacityMd} onChange={(event) => setForm((current) => ({ ...current, capacityMd: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3" /></label><div className="flex gap-2"><button disabled={saving || loading || !calendarId || !sprints.length} className="h-10 flex-1 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : editingId ? "Save" : "Add period"}</button>{editingId && <button type="button" onClick={resetForm} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700">Cancel</button>}</div></form>

@@ -28,7 +28,7 @@ function statusLabel(status: Project["status"]) {
 }
 
 export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ mockMode?: boolean }>) {
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const repository = useMemo(() => createProjectRepository(supabase, mockMode), [mockMode, supabase]);
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(!mockMode);
@@ -49,6 +49,7 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
   useEffect(() => {
     if (mockMode) return;
     let mounted = true;
+    if (!supabase) return;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (mounted) {
         setSession(nextSession);
@@ -95,6 +96,7 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!supabase) return;
     setAuthError("");
     setAuthSubmitting(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -103,6 +105,7 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
   }
 
   async function signOut() {
+    if (!supabase) return;
     setAuthError("");
     const { error } = await supabase.auth.signOut();
     if (error) setAuthError(error.message);
@@ -201,7 +204,7 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
   return (
     <PageContainer title="Project & Effort Planning" description={mockMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {mockMode ? <p className="text-sm font-medium text-amber-800">Local Mock Data Mode — no Supabase records are read or changed.</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
+        {mockMode ? <p className="text-sm font-medium text-amber-800">Demo Mode — Data saved in this browser</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
       </div>
 
       <div role="tablist" aria-label="Project planning sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">

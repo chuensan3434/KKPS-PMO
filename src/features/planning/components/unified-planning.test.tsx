@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UnifiedPlanning } from "./unified-planning";
 
 const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   projectList: vi.fn(),
@@ -15,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../lib/supabase/client", () => ({
-  createClient: () => ({ auth: { getSession: mocks.getSession, onAuthStateChange: mocks.onAuthStateChange } }),
+  createClient: mocks.createClient,
 }));
 
 vi.mock("../../resource-capacity/repositories", () => ({
@@ -39,6 +40,7 @@ describe("UnifiedPlanning loading recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mocks.createClient.mockReturnValue({ auth: { getSession: mocks.getSession, onAuthStateChange: mocks.onAuthStateChange } });
     mocks.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
     mocks.getSession.mockResolvedValue({ data: { session }, error: null });
     mocks.projectList.mockResolvedValue([]);
@@ -59,6 +61,15 @@ describe("UnifiedPlanning loading recovery", () => {
     render(<UnifiedPlanning mockMode={false} />);
     expect(await screen.findByRole("heading", { name: "Supabase session required" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry authentication" })).toBeInTheDocument();
+  });
+
+  it("loads Demo Mode without constructing a Supabase client or checking auth", async () => {
+    render(<UnifiedPlanning mockMode />);
+    expect(await screen.findByRole("heading", { name: "Roadmap Planning" })).toBeInTheDocument();
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.onAuthStateChange).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Supabase session required/)).not.toBeInTheDocument();
   });
 
   it("explains a missing Roadmap schedule table", async () => {

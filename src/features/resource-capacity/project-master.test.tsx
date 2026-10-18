@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "./domain";
 import { ProjectMaster } from "./project-master";
 
 const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   signInWithPassword: vi.fn(),
@@ -18,14 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../lib/supabase/client", () => ({
-  createClient: () => ({
-    auth: {
-      getSession: mocks.getSession,
-      onAuthStateChange: mocks.onAuthStateChange,
-      signInWithPassword: mocks.signInWithPassword,
-      signOut: mocks.signOut,
-    },
-  }),
+  createClient: mocks.createClient,
 }));
 
 vi.mock("./repositories", () => ({
@@ -53,6 +47,8 @@ const activeProject: Project = {
 const session = { user: { email: "planner@example.com" } };
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.createClient.mockReturnValue({ auth: { getSession: mocks.getSession, onAuthStateChange: mocks.onAuthStateChange, signInWithPassword: mocks.signInWithPassword, signOut: mocks.signOut } });
   mocks.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   mocks.signInWithPassword.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
@@ -61,7 +57,18 @@ beforeEach(() => {
   mocks.effortList.mockResolvedValue([]);
 });
 
+afterEach(cleanup);
+
 describe("Project Master authentication", () => {
+  it("loads Demo Mode without constructing a Supabase client or showing auth UI", async () => {
+    render(<ProjectMaster mockMode />);
+    expect(await screen.findByText("Demo Mode — Data saved in this browser")).toBeInTheDocument();
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+  });
+
   it("shows sign-in without public registration and submits email/password", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     const user = userEvent.setup();

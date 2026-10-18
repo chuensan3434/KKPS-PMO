@@ -39,7 +39,7 @@ function withTimeout<T>(request: Promise<T>, label: string) {
 }
 
 export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
-  const client = useMemo(() => createClient(), []);
+  const client = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const projectRepository = useMemo(() => createProjectRepository(client, mockMode), [client, mockMode]);
   const squadRepository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
   const effortRepository = useMemo(() => createProjectSquadEffortRepository(client, mockMode), [client, mockMode]);
@@ -72,6 +72,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
 
   useEffect(() => {
     if (mockMode) return;
+    if (!client) return;
     let mounted = true;
     const { data: listener } = client.auth.onAuthStateChange((_event, next) => { if (mounted) { setSession(next); setAccessReady(true); if (!next) setLoading(false); } });
     void withTimeout(client.auth.getSession(), "Supabase authentication")
