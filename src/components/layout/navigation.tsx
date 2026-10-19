@@ -6,10 +6,10 @@ import { useState } from "react";
 
 const navigationItems = [
   { label: "Overview", href: "/dashboard" },
+  { label: "Projects", href: "/projects" },
   { label: "Planning", href: "/planning" },
   { label: "Resources", href: "/resources" },
   { label: "Settings", href: "/settings" },
-  { label: "Manday", href: "/manday" },
 ] as const;
 
 function MenuIcon({ open }: Readonly<{ open: boolean }>) {
@@ -30,7 +30,7 @@ function NavigationLinks({ onNavigate }: Readonly<{ onNavigate?: () => void }>) 
   return (
     <nav aria-label="Primary navigation" className="flex flex-col gap-1 lg:flex-row lg:items-center">
       {navigationItems.map((item) => {
-        const active = pathname === item.href || (item.href === "/planning" && pathname === "/projects");
+        const active = pathname === item.href;
 
         return (
           <Link
