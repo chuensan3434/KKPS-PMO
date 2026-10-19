@@ -5,11 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const navigationItems = [
-  { label: "Dashboard", href: "/dashboard" },
+  { label: "Overview", href: "/dashboard" },
   { label: "Projects", href: "/projects" },
   { label: "Planning", href: "/planning" },
   { label: "Resources", href: "/resources" },
-  { label: "Manday", href: "/manday" },
   { label: "Settings", href: "/settings" },
 ] as const;
 
@@ -29,7 +28,7 @@ function NavigationLinks({ onNavigate }: Readonly<{ onNavigate?: () => void }>) 
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Primary navigation" className="space-y-1">
+    <nav aria-label="Primary navigation" className="flex flex-col gap-1 lg:flex-row lg:items-center">
       {navigationItems.map((item) => {
         const active = pathname === item.href;
 
@@ -39,16 +38,12 @@ function NavigationLinks({ onNavigate }: Readonly<{ onNavigate?: () => void }>) 
             href={item.href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+            className={`flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
               active
-                ? "bg-blue-50 text-blue-800"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                ? "bg-[var(--ink)] text-white"
+                : "text-[#596057] hover:bg-[#eef0ea] hover:text-[var(--ink)]"
             }`}
           >
-            <span
-              aria-hidden="true"
-              className={`mr-3 size-2 rounded-full ${active ? "bg-blue-600" : "bg-slate-300"}`}
-            />
             {item.label}
           </Link>
         );
@@ -62,38 +57,33 @@ export function Navigation() {
 
   return (
     <>
-      <aside className="hidden min-h-screen border-r border-slate-200 bg-white px-4 py-6 lg:block">
-        <div className="mb-8 px-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">KKPS</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-slate-950">PMO</p>
-        </div>
-        <NavigationLinks />
-      </aside>
-
-      <header className="border-b border-slate-200 bg-white lg:hidden">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-          <Link
-            href="/dashboard"
-            className="rounded text-lg font-bold tracking-tight text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-            onClick={() => setMobileOpen(false)}
-          >
-            KKPS PMO
+      <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[color:rgba(255,255,255,.94)] backdrop-blur-lg">
+        <div className="mx-auto flex h-[4.5rem] max-w-[1600px] items-center gap-6 px-4 sm:px-6 lg:px-8">
+          <Link href="/dashboard" className="flex shrink-0 items-center gap-3 rounded-md" onClick={() => setMobileOpen(false)}>
+            <span aria-hidden="true" className="grid size-9 place-items-center rounded-xl bg-[var(--accent)] text-sm font-black text-[var(--ink)]">K</span>
+            <span><span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-[#737a70]">KKPS</span><span className="block text-lg font-extrabold leading-5 tracking-[-0.03em]">PMO</span></span>
           </Link>
+          <div className="hidden flex-1 justify-center lg:flex"><NavigationLinks /></div>
+          <div className="hidden shrink-0 items-center gap-2 text-right lg:flex">
+            <Link href="/manday" className="rounded-full px-3 py-2 text-xs font-semibold text-[#697067] hover:bg-[#eef0ea]">Manday</Link>
+            <span className="h-6 w-px bg-[var(--border)]" />
+            <span className="text-xs font-semibold text-[#697067]">Project Management Office</span>
+          </div>
           <button
             type="button"
             aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={mobileOpen}
             aria-controls="mobile-navigation"
             onClick={() => setMobileOpen((open) => !open)}
-            className="flex size-11 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            className="ml-auto flex size-11 items-center justify-center rounded-xl text-[#4d554b] hover:bg-[#eef0ea] lg:hidden"
           >
             <MenuIcon open={mobileOpen} />
           </button>
         </div>
-
         {mobileOpen ? (
-          <div id="mobile-navigation" className="border-t border-slate-200 px-4 py-3 sm:px-6">
+          <div id="mobile-navigation" className="border-t border-[var(--border)] px-4 py-3 sm:px-6 lg:hidden">
             <NavigationLinks onNavigate={() => setMobileOpen(false)} />
+            <Link href="/manday" onClick={() => setMobileOpen(false)} className="mt-1 flex min-h-10 items-center rounded-full px-4 text-sm font-semibold text-[#596057]">Manday</Link>
           </div>
         ) : null}
       </header>

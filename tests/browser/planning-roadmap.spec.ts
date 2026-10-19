@@ -93,10 +93,12 @@ test("member capacity is the only active source and Capacity Timeline stays in R
 test("completes planner interactions and persists them in Demo Mode", async ({ page }) => {
   await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
   await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
+  await page.getByText("Manage Squad Members", { exact: true }).click();
   await page.getByLabel("New member name").fill("Demo Member");
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
   await page.getByLabel("Demo Member default availability").fill("80");
   await expect(page.getByText("Per-Sprint overrides")).toHaveCount(0);
+  await page.getByText("Manage Work Types", { exact: true }).click();
   await page.getByLabel("Move Dev down").click();
   await page.getByLabel("Row employee").selectOption({ label: "Demo Member" });
   await page.getByLabel("Row work type").selectOption({ label: "Dev" });
@@ -114,7 +116,7 @@ test("completes planner interactions and persists them in Demo Mode", async ({ p
   await page.getByRole("button", { name: "Apply copy" }).click();
   await expect(page.getByLabel("Demo Member Dev S3", { exact: true })).toHaveValue("60");
   await page.getByRole("img", { name: /100% stacked area chart/ }).getByText("S1", { exact: true }).click();
-  await expect(page.getByLabel("Demo Member Dev S1", { exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-blue-50/);
+  await expect(page.getByLabel("Demo Member Dev S1", { exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-\[#f5f9d7\]/);
   await page.reload();
   await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
   await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
@@ -140,6 +142,7 @@ test("previews individual Sprint adjustment and creates a separate calendar vers
 
 test("one global non-working-day adjustment recalculates member capacity for every squad", async ({ page }) => {
   await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await page.getByText("Manage Squad Members", { exact: true }).click();
   await page.getByLabel("New member name").fill("Alpha Member");
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
   await page.getByLabel("Planner squad").selectOption({ label: "Squad Beta" });
