@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("loads Project Master records, schedules, persists after refresh, and unschedules without changing effort", async ({ page }) => {
-  await expect(page.getByText("CRM Enhancement", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CRM Enhancement" })).toBeVisible();
   await page.getByRole("button", { name: "Schedule in S1" }).first().click();
   await expect(page.getByRole("button", { name: "CRM Enhancement, S1 to S2" })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("kkps-pmo:local-mock-data:v1"))).toContain(projectId);
@@ -26,7 +26,7 @@ test("loads Project Master records, schedules, persists after refresh, and unsch
   await expect(page.getByRole("button", { name: "CRM Enhancement, S1 to S2" })).toBeVisible();
   await page.getByRole("button", { name: "CRM Enhancement, S1 to S2" }).click();
   await page.getByRole("button", { name: "Return to backlog" }).click();
-  await expect(page.getByText("CRM Enhancement", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CRM Enhancement" })).toBeVisible();
 });
 
 test("moves, extends, and shrinks a schedule on whole-Sprint boundaries", async ({ page }) => {
@@ -50,9 +50,9 @@ test("a newly created Project appears once in the Roadmap backlog", async ({ pag
   await page.getByRole("tab", { name: "Project Master" }).click();
   await page.getByLabel("Project name").fill("Unified New Project");
   await page.getByRole("button", { name: "Create project" }).click();
-  await expect(page.getByText("Unified New Project", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Unified New Project" })).toHaveCount(1);
   await page.getByRole("link", { name: "Planning" }).click();
-  await expect(page.getByText("Unified New Project", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Unified New Project" })).toHaveCount(1);
 });
 
 test("edits project-first effort estimates and preserves canonical demand data in Demo Mode", async ({ page }) => {
@@ -72,13 +72,13 @@ test("edits project-first effort estimates and preserves canonical demand data i
   await page.getByLabel("CRM Enhancement Squad Alpha Dev MD").fill("12.5");
   await page.getByLabel("CRM Enhancement Squad Alpha QA MD").fill("4.5");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("row", { name: /^▾ CRM Enhancement/ })).toContainText("17");
+  await expect(page.getByRole("row").filter({ hasText: "CRM Enhancement" }).first()).toContainText("17");
   await page.reload();
   await page.getByRole("button", { name: "Effort Estimation" }).click();
-  await page.getByRole("row", { name: /^▸ CRM Enhancement/ }).getByRole("button", { name: "Expand" }).click();
+  await page.getByRole("row").filter({ hasText: "CRM Enhancement" }).first().getByRole("button", { name: "Expand" }).click();
   await expect(page.getByLabel("CRM Enhancement Squad Alpha Dev MD")).toHaveValue("12.5");
   await page.getByRole("button", { name: "Roadmap" }).click();
-  await expect(page.getByText("CRM Enhancement", { exact: true }).locator("..")).toContainText("17 MD");
+  await expect(page.locator("article").filter({ hasText: "CRM Enhancement" }).first()).toContainText("17 MD");
 });
 
 test("member capacity is the only active source and Capacity Timeline stays in Roadmap", async ({ page }) => {
@@ -155,6 +155,6 @@ test("one global non-working-day adjustment recalculates member capacity for eve
   await page.getByLabel("S1 Holiday / Non-working Days").fill("2");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Confirm and create calendar version" }).click();
-  await expect(page.getByRole("row", { name: /Squad Alpha 8 MD capacity/ })).toBeVisible();
-  await expect(page.getByRole("row", { name: /Squad Beta 4 MD capacity/ })).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: "Squad Alpha" })).toContainText("0 demand / 8 capacity");
+  await expect(page.getByRole("row").filter({ hasText: "Squad Beta" })).toContainText("0 demand / 4 capacity");
 });
