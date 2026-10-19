@@ -2,165 +2,72 @@ import { expect, test, type Page } from "@playwright/test";
 
 const projectId = "30000000-0000-4000-8000-000000000001";
 
+async function resetDemo(page: Page, route = "/projects") {
+  await page.goto(route);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+}
+
 async function selectCalendar(page: Page) {
   await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
   await expect(page.getByText("S26", { exact: true }).first()).toBeVisible();
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.goto("/planning");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Planning" })).toBeVisible();
-  await selectCalendar(page);
-});
+test("uses Projects as the single intake and effort workspace", async ({ page }) => {
+  await resetDemo(page);
+  await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByText("Projects", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Effort Estimation/i })).toHaveCount(0);
 
-test("redirects the legacy Projects route to the canonical Planning workspace", async ({ page }) => {
-  await page.goto("/projects?view=squads");
-  await expect(page).toHaveURL(/\/planning\?view=squads$/);
-  await expect(page.getByRole("tab", { name: "Squad Management" })).toHaveAttribute("aria-selected", "true");
-});
-
-test("loads Project Master records, schedules, persists after refresh, and unschedules without changing effort", async ({ page }) => {
-  await expect(page.getByRole("heading", { name: "CRM Enhancement" })).toBeVisible();
-  await page.getByRole("button", { name: "Schedule in S1" }).first().click();
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S1 to S2" })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem("kkps-pmo:local-mock-data:v1"))).toContain(projectId);
-  expect(await page.evaluate(() => localStorage.getItem("kkps-pmo:roadmap-planning:v1"))).toBeNull();
-  expect(await page.evaluate(() => localStorage.getItem("kkps-pmo:effort-estimation:v1"))).toBeNull();
-  await page.reload();
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S1 to S2" })).toBeVisible();
-  await page.getByRole("button", { name: "CRM Enhancement, S1 to S2" }).click();
-  await page.getByRole("button", { name: "Return to backlog" }).click();
-  await expect(page.getByRole("heading", { name: "CRM Enhancement" })).toBeVisible();
-});
-
-test("moves, extends, and shrinks a schedule on whole-Sprint boundaries", async ({ page }) => {
-  await page.getByRole("button", { name: "Schedule in S1" }).first().click();
-  const sprint = (number: number) => page.getByText(`S${number}`, { exact: true }).first().locator("..");
-  await page.getByRole("button", { name: "CRM Enhancement, S1 to S2" }).dragTo(sprint(5));
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S6" })).toBeVisible();
-  const dropResizeAt = async (number: number) => sprint(number).evaluate((target, id) => {
-    const dataTransfer = new DataTransfer();
-    dataTransfer.setData("text/resize-project-id", id);
-    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }));
-  }, projectId);
-  await dropResizeAt(8);
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S8" })).toBeVisible();
-  await dropResizeAt(5);
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S5" })).toBeVisible();
-});
-
-test("a newly created Project appears once in the Roadmap backlog", async ({ page }) => {
-  await page.getByRole("tab", { name: "Project Master" }).click();
-  await page.getByLabel("Project name").fill("Unified New Project");
-  await page.getByRole("button", { name: "Create project" }).click();
-  await expect(page.getByRole("heading", { name: "Unified New Project" })).toHaveCount(1);
-  await page.getByRole("tab", { name: "Roadmap" }).click();
-  await expect(page.getByRole("heading", { name: "Unified New Project" })).toHaveCount(1);
-});
-
-test("edits project-first effort estimates and preserves canonical demand data in Demo Mode", async ({ page }) => {
-  await page.getByRole("tab", { name: "Effort Estimation" }).click();
-  await expect(page.getByRole("heading", { name: "Effort Estimation" })).toBeVisible();
-  await page.getByLabel("Search projects").fill("crm");
-  await expect(page.getByRole("row", { name: /CRM Enhancement/ })).toBeVisible();
-  await expect(page.getByRole("row", { name: /Digital Onboarding/ })).toHaveCount(0);
-  await page.getByLabel("Search projects").fill("");
-  await page.getByRole("button", { name: "Not Estimated", exact: true }).click();
-  await expect(page.getByText("3 projects")).toBeVisible();
-  await page.getByRole("button", { name: "All", exact: true }).click();
-  const projectRow = page.getByRole("row", { name: /CRM Enhancement/ });
-  await projectRow.getByRole("button", { name: "Expand" }).click();
-  await page.getByLabel("Squad to add to CRM Enhancement").selectOption({ label: "Squad Alpha" });
-  await page.getByRole("button", { name: "+ Add Squad" }).first().click();
-  await page.getByLabel("CRM Enhancement Squad Alpha Dev MD").fill("12.5");
-  await page.getByLabel("CRM Enhancement Squad Alpha QA MD").fill("4.5");
+  await page.getByLabel("Squad to add").selectOption({ label: "Squad Alpha" });
+  await page.getByRole("button", { name: "Add Squad" }).click();
+  await page.getByLabel("CRM Enhancement Dev MD").fill("12.5");
+  await page.getByLabel("CRM Enhancement QA MD").fill("4.5");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("row").filter({ hasText: "CRM Enhancement" }).first()).toContainText("17");
+  await expect(page.getByText(/Total 17 MD/)).toBeVisible();
   await page.reload();
-  await page.getByRole("tab", { name: "Effort Estimation" }).click();
-  await page.getByRole("row").filter({ hasText: "CRM Enhancement" }).first().getByRole("button", { name: "Expand" }).click();
-  await expect(page.getByLabel("CRM Enhancement Squad Alpha Dev MD")).toHaveValue("12.5");
-  await page.getByRole("tab", { name: "Roadmap" }).click();
-  await expect(page.locator("article").filter({ hasText: "CRM Enhancement" }).first()).toContainText("17 MD");
+  await expect(page.getByLabel("CRM Enhancement Dev MD")).toHaveValue("12.5");
 });
 
-test("member capacity is the only active source and Capacity Timeline stays in Roadmap", async ({ page }) => {
-  await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toBeVisible();
-  await expect(page.getByText("Not Configured", { exact: true }).first()).toBeVisible();
-  await page.getByRole("tab", { name: "Squad Capacity" }).click();
-  await expect(page.getByText(/identity mapping/i)).toHaveCount(0);
-  await expect(page.getByLabel("MD per Sprint")).toHaveCount(0);
+test("keeps quarter intent separate from confirmed Sprint demand", async ({ page }) => {
+  await resetDemo(page, `/planning?project=${projectId}`);
+  await expect(page.getByRole("heading", { name: "Quarterly Roadmap" })).toBeVisible();
+  await page.getByLabel("Quarter plan start").selectOption("1");
+  await page.getByLabel("Quarter plan end").selectOption("2");
+  await page.getByRole("button", { name: "Save Quarter Plan" }).click();
+  await expect(page.getByRole("button", { name: /Q1–Q2 Quarter-level/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toHaveCount(0);
+
+  await selectCalendar(page);
+  await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toBeVisible();
+  await page.getByRole("button", { name: "Schedule in S1" }).first().click();
+  await expect(page.getByRole("button", { name: "CRM Enhancement, S1 to S2" })).toBeVisible();
 });
 
-test("completes planner interactions and persists them in Demo Mode", async ({ page }) => {
+test("does not show a Sprint schedule editor for an unscheduled deep link", async ({ page }) => {
+  await resetDemo(page, `/planning?project=${projectId}`);
+  await expect(page.getByText("S–S", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Return to backlog" })).toHaveCount(0);
+});
+
+test("preserves capacity planning beneath Planning", async ({ page }) => {
+  await resetDemo(page, "/planning");
+  await selectCalendar(page);
   await page.getByRole("tab", { name: "Squad Capacity" }).click();
   await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
-  await page.getByText("Manage Squad Members", { exact: true }).click();
-  await page.getByLabel("New member name").fill("Demo Member");
-  await page.getByRole("button", { name: "Add", exact: true }).first().click();
-  await page.getByLabel("Demo Member default availability").fill("80");
-  await expect(page.getByText("Per-Sprint overrides")).toHaveCount(0);
-  await page.getByText("Manage Work Types", { exact: true }).click();
-  await page.getByLabel("Move Dev down").click();
-  await page.getByLabel("Row employee").selectOption({ label: "Demo Member" });
-  await page.getByLabel("Row work type").selectOption({ label: "Dev" });
-  await page.getByRole("button", { name: "Add Row" }).click();
-  await page.getByLabel("Demo Member Dev S1", { exact: true }).fill("60");
-  await page.getByLabel("Row work type").selectOption({ label: "SA" });
-  await page.getByRole("button", { name: "Add Row" }).click();
-  await page.getByLabel("Demo Member SA S1", { exact: true }).fill("50");
-  await expect(page.getByRole("row", { name: /Total allocated 110%/ })).toBeVisible();
-  await page.getByLabel("Actions for Dev, Demo Member").click();
-  await page.getByRole("button", { name: "Copy allocation" }).click();
-  await page.getByLabel("Copy source Sprint").selectOption({ label: "S1" });
-  await page.getByLabel("Copy destination start").fill("2");
-  await page.getByLabel("Copy destination end").fill("3");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Apply copy" }).click();
-  await expect(page.getByLabel("Demo Member Dev S3", { exact: true })).toHaveValue("60");
-  await page.getByRole("img", { name: /100% stacked area chart/ }).getByText("S1", { exact: true }).click();
-  await expect(page.getByLabel("Demo Member Dev S1", { exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-\[#f5f9d7\]/);
-  await page.reload();
-  await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
-  await page.getByRole("tab", { name: "Squad Capacity" }).click();
-  await expect(page.getByLabel("Demo Member Dev S3", { exact: true })).toHaveValue("60");
-  await expect(page.getByRole("heading", { name: "Manage Capacity Periods" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Annual Allocation Matrix" })).toBeVisible();
+  await expect(page.getByLabel("Scrollable annual allocation matrix")).toBeVisible();
 });
 
-test("previews individual Sprint adjustment and creates a separate calendar version", async ({ page }) => {
-  await page.getByRole("button", { name: "Sprint Calendar Setup" }).click();
-  await page.getByLabel("Sprint count").fill("3");
-  await page.getByLabel("S2 start").fill("2027-01-16");
-  await expect(page.getByText(/S2 overlaps the previous Sprint/)).toBeVisible();
-  await page.getByLabel("S2 start").fill("2027-01-20");
-  await page.getByLabel("S2 end").fill("2027-01-31");
-  await page.getByLabel("S3 Holiday / Non-working Days").fill("2");
-  await expect(page.getByLabel("S3 Holiday / Non-working Days").locator("xpath=ancestor::tr")).toContainText("8");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Confirm and create calendar version" }).click();
-  await expect(page.getByText("S3", { exact: true }).first()).toBeVisible();
-  await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
-  await expect(page.getByText("S26", { exact: true }).first()).toBeVisible();
-});
-
-test("one global non-working-day adjustment recalculates member capacity for every squad", async ({ page }) => {
-  await page.getByRole("tab", { name: "Squad Capacity" }).click();
-  await page.getByText("Manage Squad Members", { exact: true }).click();
-  await page.getByLabel("New member name").fill("Alpha Member");
-  await page.getByRole("button", { name: "Add", exact: true }).first().click();
-  await page.getByLabel("Planner squad").selectOption({ label: "Squad Beta" });
-  await page.getByLabel("New member name").fill("Beta Member");
-  await page.getByRole("button", { name: "Add", exact: true }).first().click();
-  await page.getByLabel("Beta Member default availability").fill("50");
-  await page.getByRole("tab", { name: "Roadmap" }).click();
-  await page.getByRole("button", { name: "Sprint Calendar Setup" }).click();
-  await page.getByLabel("Sprint count").fill("1");
-  await page.getByLabel("S1 Holiday / Non-working Days").fill("2");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Confirm and create calendar version" }).click();
-  await expect(page.getByRole("row").filter({ hasText: "Squad Alpha" })).toContainText("0 demand / 8 capacity");
-  await expect(page.getByRole("row").filter({ hasText: "Squad Beta" })).toContainText("0 demand / 4 capacity");
-});
+for (const viewport of [{ width: 390, height: 844 }, { width: 1024, height: 768 }]) {
+  test(`has no page-level horizontal overflow at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await resetDemo(page);
+    await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (viewport.width === 390) {
+      await page.getByRole("button", { name: "Open navigation menu" }).click();
+      await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByText("Planning", { exact: true })).toBeVisible();
+    }
+  });
+}

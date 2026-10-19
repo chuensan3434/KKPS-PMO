@@ -137,7 +137,7 @@ export function UnifiedPlanning({ mockMode, initialView = "roadmap", initialProj
   const planning = useMemo(() => buildUnifiedPlanningState(projects, squads, efforts, schedules, sprints), [efforts, projects, schedules, sprints, squads]);
   const backlog = planning.projects.filter((project) => project.status === "unscheduled");
   const scheduled = planning.projects.filter((project) => project.status === "scheduled");
-  const selected = planning.projects.find((project) => project.id === selectedId) ?? null;
+  const selected = planning.projects.find((project) => project.id === selectedId && project.status === "scheduled") ?? null;
   const packedProjects = useMemo(() => packProjectsIntoLanes(scheduled), [scheduled]);
   const laneCount = Math.max(1, ...packedProjects.map((item) => item.lane + 1));
 

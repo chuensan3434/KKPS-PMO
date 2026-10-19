@@ -7,6 +7,8 @@ import { createProjectImportRepository } from "./project-import-repository";
 import { importPayload, previewProjectImport, type ImportPreview } from "./project-import";
 
 const headers = ["Project Name", "Description", "Business Unit", "PO / Owner", "Target Date", "Planned Year", "Start Quarter", "End Quarter", "Squad", "Dev MD", "QA MD"];
+const maxWorkbookBytes = 5 * 1024 * 1024;
+const maxImportRows = 5_000;
 
 export function ProjectImportDialog({ client, mockMode, projects, squads, onClose, onImported }: Readonly<{ client: SupabaseClient | null; mockMode: boolean; projects: Project[]; squads: Squad[]; onClose: () => void; onImported: () => void }>) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -17,11 +19,13 @@ export function ProjectImportDialog({ client, mockMode, projects, squads, onClos
     setBusy(true); setError(""); setResult(""); setFileName(file.name);
     try {
       if (!file.name.toLocaleLowerCase().endsWith(".xlsx")) throw new Error("Choose an Excel .xlsx file.");
+      if (file.size > maxWorkbookBytes) throw new Error("The workbook is larger than 5 MB. Split it into smaller imports.");
       const ExcelJS = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(await file.arrayBuffer());
       const sheet = workbook.worksheets[0];
       if (!sheet) throw new Error("The workbook does not contain a worksheet.");
+      if (sheet.rowCount - 1 > maxImportRows) throw new Error("The worksheet has more than 5,000 data rows. Split it into smaller imports.");
       const headerRow = sheet.getRow(1).values as unknown[];
       const parsedRows: Record<string, unknown>[] = [];
       for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
