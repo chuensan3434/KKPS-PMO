@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { loadPlanningState } from "@/features/planning/planning-storage";
-import type { PlanningState } from "@/features/planning/types";
+import { useMemo, useRef, useState } from "react";
 import { parseActitimeCsv } from "../actitime-parser";
-import { buildResourcePortfolio, getEstimatedMandays, getPortfolioPeriodLabel } from "../resource-portfolio";
+import { buildResourcePortfolio, getPortfolioPeriodLabel } from "../resource-portfolio";
 import type { EffortShare, SummaryItem, WorkEntry, WorkFilters } from "../types";
 import { ResourcePortfolioDashboard } from "./resource-portfolio-dashboard";
 import {
@@ -107,12 +105,6 @@ export function WorkSummaryDashboard() {
   const [filters, setFilters] = useState<WorkFilters>(emptyFilters);
   const [selectedProjectKey, setSelectedProjectKey] = useState("");
   const [activeView, setActiveView] = useState<"summary" | "customer" | "resource">("summary");
-  const [planning, setPlanning] = useState<PlanningState | null>(null);
-
-  useEffect(() => {
-    const loadedPlanning = loadPlanningState();
-    queueMicrotask(() => setPlanning(loadedPlanning));
-  }, []);
 
   const filteredEntries = useMemo(() => filterWorkEntries(entries, filters), [entries, filters]);
   const summary = useMemo(() => summarizeWork(filteredEntries), [filteredEntries]);
@@ -123,12 +115,6 @@ export function WorkSummaryDashboard() {
   const resourcePortfolio = useMemo(() => buildResourcePortfolio(filteredEntries), [filteredEntries]);
   const effectiveDateFrom = filters.dateFrom || dateRange.min;
   const effectiveDateTo = filters.dateTo || dateRange.max;
-  const estimatedMandays = useMemo(() => getEstimatedMandays(planning, {
-    dateFrom: effectiveDateFrom,
-    dateTo: effectiveDateTo,
-    customer: filters.customer,
-    project: filters.project,
-  }), [effectiveDateFrom, effectiveDateTo, filters.customer, filters.project, planning]);
   const selectedProject = projectAnalyses.find(({ key }) => key === selectedProjectKey) ?? projectAnalyses[0];
 
   async function handleFile(file: File | undefined) {
@@ -360,7 +346,7 @@ export function WorkSummaryDashboard() {
             ) : <p className="mt-5 text-sm text-slate-500">No customer effort matches the current filters.</p>}
           </section> : null}
 
-          {activeView === "resource" ? <ResourcePortfolioDashboard portfolio={resourcePortfolio} periodLabel={getPortfolioPeriodLabel(effectiveDateFrom, effectiveDateTo)} estimatedMandays={estimatedMandays} /> : null}
+          {activeView === "resource" ? <ResourcePortfolioDashboard portfolio={resourcePortfolio} periodLabel={getPortfolioPeriodLabel(effectiveDateFrom, effectiveDateTo)} estimatedMandays={null} /> : null}
         </>
       ) : null}
     </div>
