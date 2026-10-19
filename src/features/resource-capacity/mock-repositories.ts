@@ -1,11 +1,11 @@
-import { projectCreateSchema, projectRoadmapScheduleCreateSchema, projectRoadmapScheduleUpdateSchema, projectSquadEffortCreateSchema, projectSquadEffortUpdateSchema, projectUpdateSchema, squadCapacityPeriodCreateSchema, squadCapacityPeriodUpdateSchema, squadCreateSchema, squadUpdateSchema, sprintCalendarCreateSchema, sprintCalendarUpdateSchema, sprintCreateSchema, sprintUpdateSchema, type Project, type ProjectRoadmapSchedule, type ProjectSquadEffort, type Sprint, type SprintCalendar, type Squad, type SquadCapacityPeriod } from "./domain";
+import { projectCreateSchema, projectQuarterPlanCreateSchema, projectQuarterPlanUpdateSchema, projectRoadmapScheduleCreateSchema, projectRoadmapScheduleUpdateSchema, projectSquadEffortCreateSchema, projectSquadEffortUpdateSchema, projectUpdateSchema, squadCapacityPeriodCreateSchema, squadCapacityPeriodUpdateSchema, squadCreateSchema, squadUpdateSchema, sprintCalendarCreateSchema, sprintCalendarUpdateSchema, sprintCreateSchema, sprintUpdateSchema, type Project, type ProjectQuarterPlan, type ProjectRoadmapSchedule, type ProjectSquadEffort, type Sprint, type SprintCalendar, type Squad, type SquadCapacityPeriod } from "./domain";
 
 const storageKey = "kkps-pmo:local-mock-data:v1";
 const calendarId = "10000000-0000-4000-8000-000000000001";
 const squadIds = ["20000000-0000-4000-8000-000000000001", "20000000-0000-4000-8000-000000000002", "20000000-0000-4000-8000-000000000003"];
 const projectIds = ["30000000-0000-4000-8000-000000000001", "30000000-0000-4000-8000-000000000002", "30000000-0000-4000-8000-000000000003"];
 
-type MockStore = { squads: Squad[]; projects: Project[]; efforts: ProjectSquadEffort[]; calendars: SprintCalendar[]; sprints: Sprint[]; periods: SquadCapacityPeriod[]; schedules: ProjectRoadmapSchedule[] };
+type MockStore = { squads: Squad[]; projects: Project[]; efforts: ProjectSquadEffort[]; calendars: SprintCalendar[]; sprints: Sprint[]; periods: SquadCapacityPeriod[]; schedules: ProjectRoadmapSchedule[]; quarterPlans: ProjectQuarterPlan[] };
 const now = () => new Date().toISOString();
 
 function initialStore(): MockStore {
@@ -19,11 +19,11 @@ function initialStore(): MockStore {
     const coverageEnd = new Date(start); coverageEnd.setUTCDate(coverageEnd.getUTCDate() + 13);
     return { id: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, calendar_id: calendarId, sprint_code: `2027-S${index + 1}`, sequence_number: index + 1, start_date: start.toISOString().slice(0, 10), display_end_date: displayEnd.toISOString().slice(0, 10), coverage_end_date: coverageEnd.toISOString().slice(0, 10), holiday_adjustment_days: 0, created_at: created, updated_at: created };
   });
-  return { squads, projects, efforts: [], calendars, sprints, periods: [], schedules: [] };
+  return { squads, projects, efforts: [], calendars, sprints, periods: [], schedules: [], quarterPlans: [] };
 }
 
 function write(store: MockStore) { window.localStorage.setItem(storageKey, JSON.stringify(store)); }
-function read(): MockStore { const value = window.localStorage.getItem(storageKey); if (value) { try { const parsed = JSON.parse(value) as MockStore; return { ...parsed, schedules: parsed.schedules ?? [], sprints: parsed.sprints.map((sprint) => ({ ...sprint, holiday_adjustment_days: sprint.holiday_adjustment_days ?? 0 })) }; } catch {} } const store = initialStore(); write(store); return store; }
+function read(): MockStore { const value = window.localStorage.getItem(storageKey); if (value) { try { const parsed = JSON.parse(value) as MockStore; return { ...parsed, schedules: parsed.schedules ?? [], quarterPlans: parsed.quarterPlans ?? [], sprints: parsed.sprints.map((sprint) => ({ ...sprint, holiday_adjustment_days: sprint.holiday_adjustment_days ?? 0 })) }; } catch {} } const store = initialStore(); write(store); return store; }
 function change(mutate: (store: MockStore) => void) { const store = read(); mutate(store); write(store); }
 const uuid = () => crypto.randomUUID();
 
@@ -71,8 +71,15 @@ export function createMockScheduleRepository() { return {
   async archive(recordId: string) { let result!: ProjectRoadmapSchedule; change((store) => { store.schedules = store.schedules.map((record) => record.id === recordId ? (result = { ...record, archived_at: now(), updated_at: now() }) : record); }); return result; },
 }; }
 
-export function importMockProjectsWithEfforts(payload: Array<{ project_name: string; description: string | null; business_unit: string | null; owner_name: string | null; target_date: string | null; status: "draft"; efforts: Array<{ squad_id: string; dev_md: number; qa_md: number }> }>) {
-  let createdProjects = 0, createdEfforts = 0, skippedProjects = 0;
+export function createMockQuarterPlanRepository() { return {
+  async list(year?: number) { return read().quarterPlans.filter((record) => !year || record.planned_year === year); },
+  async create(input: unknown) { const values = projectQuarterPlanCreateSchema.parse(input); const timestamp = now(); const record = { id: uuid(), ...values, archived_at: null, created_at: timestamp, updated_at: timestamp }; change((store) => { store.quarterPlans.push(record); }); return record; },
+  async update(recordId: string, input: unknown) { const values = projectQuarterPlanUpdateSchema.parse(input); let result!: ProjectQuarterPlan; change((store) => { store.quarterPlans = store.quarterPlans.map((record) => record.id === recordId ? (result = { ...record, ...values, updated_at: now() }) : record); }); return result; },
+  async archive(recordId: string) { let result!: ProjectQuarterPlan; change((store) => { store.quarterPlans = store.quarterPlans.map((record) => record.id === recordId ? (result = { ...record, archived_at: now(), updated_at: now() }) : record); }); return result; },
+}; }
+
+export function importMockProjectsWithEfforts(payload: Array<{ project_name: string; description: string | null; business_unit: string | null; owner_name: string | null; target_date: string | null; status: "draft"; planned_year?: number | null; start_quarter?: number | null; end_quarter?: number | null; efforts: Array<{ squad_id: string; dev_md: number; qa_md: number }> }>) {
+  let createdProjects = 0, createdEfforts = 0, createdQuarterPlans = 0, skippedProjects = 0;
   change((store) => {
     const activeNames = new Set(store.projects.filter((project) => project.archived_at === null).map((project) => project.project_name.trim().toLocaleLowerCase()));
     const activeSquads = new Set(store.squads.filter((squad) => squad.active).map((squad) => squad.id));
@@ -83,8 +90,9 @@ export function importMockProjectsWithEfforts(payload: Array<{ project_name: str
       const timestamp = now(), projectId = uuid();
       store.projects.push({ id: projectId, project_name: name, description: item.description, business_unit: item.business_unit, owner_name: item.owner_name, target_date: item.target_date, status: item.status, metadata: {}, archived_at: null, created_at: timestamp, updated_at: timestamp });
       item.efforts.forEach((effort) => store.efforts.push({ id: uuid(), project_id: projectId, ...effort, archived_at: null, created_at: timestamp, updated_at: timestamp }));
+      if (item.planned_year && item.start_quarter && item.end_quarter) { store.quarterPlans.push({ id: uuid(), project_id: projectId, planned_year: item.planned_year, start_quarter: item.start_quarter, end_quarter: item.end_quarter, archived_at: null, created_at: timestamp, updated_at: timestamp }); createdQuarterPlans += 1; }
       activeNames.add(normalized); createdProjects += 1; createdEfforts += item.efforts.length;
     }
   });
-  return { created_projects: createdProjects, created_efforts: createdEfforts, skipped_projects: skippedProjects };
+  return { created_projects: createdProjects, created_efforts: createdEfforts, created_quarter_plans: createdQuarterPlans, skipped_projects: skippedProjects };
 }

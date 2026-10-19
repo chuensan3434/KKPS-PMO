@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { importMockProjectsWithEfforts } from "../resource-capacity/mock-repositories";
 
-const resultSchema = z.object({ created_projects: z.number().int().nonnegative(), created_efforts: z.number().int().nonnegative(), skipped_projects: z.number().int().nonnegative() });
+const resultSchema = z.object({ created_projects: z.number().int().nonnegative(), created_efforts: z.number().int().nonnegative(), created_quarter_plans: z.number().int().nonnegative().default(0), skipped_projects: z.number().int().nonnegative() });
 export type ProjectImportPayload = Parameters<typeof importMockProjectsWithEfforts>[0];
 
 export function createProjectImportRepository(client: SupabaseClient | null, mockMode: boolean) {

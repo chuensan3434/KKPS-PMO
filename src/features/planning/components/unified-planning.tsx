@@ -3,8 +3,8 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
-import type { Project, ProjectRoadmapSchedule, ProjectSquadEffort, Sprint, SprintCalendar, Squad } from "../../resource-capacity/domain";
-import { createProjectRepository, createProjectRoadmapScheduleRepository, createProjectSquadEffortRepository, createSquadRepository, createSprintRepository } from "../../resource-capacity/repositories";
+import type { Project, ProjectQuarterPlan, ProjectRoadmapSchedule, ProjectSquadEffort, Sprint, SprintCalendar, Squad } from "../../resource-capacity/domain";
+import { createProjectQuarterPlanRepository, createProjectRepository, createProjectRoadmapScheduleRepository, createProjectSquadEffortRepository, createSquadRepository, createSprintRepository } from "../../resource-capacity/repositories";
 import { loadSelectedCalendarId, saveSelectedCalendarId } from "../calendar-selection-storage";
 import { validateSharedSprintCalendar } from "../capacity-periods";
 import { scheduleProject, setProjectEndSprint, setProjectStartSprint } from "../roadmap-actions";
@@ -15,6 +15,7 @@ import { buildUnifiedPlanningState } from "../unified-planning";
 import { CapacityPlanning } from "./capacity-planning";
 import { SprintCalendarSetup } from "./sprint-calendar-setup";
 import { RoadmapCapacityTimeline } from "./roadmap-capacity-timeline";
+import { QuarterlyRoadmap } from "./quarterly-roadmap";
 
 const sprintWidth = 112;
 const requestTimeoutMs = 10_000;
@@ -37,13 +38,14 @@ function withTimeout<T>(request: Promise<T>, label: string) {
   });
 }
 
-export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<{ mockMode: boolean; initialView?: PlanningView }>) {
+export function UnifiedPlanning({ mockMode, initialView = "roadmap", initialProjectId = "" }: Readonly<{ mockMode: boolean; initialView?: PlanningView; initialProjectId?: string }>) {
   const client = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const projectRepository = useMemo(() => createProjectRepository(client, mockMode), [client, mockMode]);
   const squadRepository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
   const effortRepository = useMemo(() => createProjectSquadEffortRepository(client, mockMode), [client, mockMode]);
   const sprintRepository = useMemo(() => createSprintRepository(client, mockMode), [client, mockMode]);
   const scheduleRepository = useMemo(() => createProjectRoadmapScheduleRepository(client, mockMode), [client, mockMode]);
+  const quarterPlanRepository = useMemo(() => createProjectQuarterPlanRepository(client, mockMode), [client, mockMode]);
   const [session, setSession] = useState<Session | null>(null);
   const [accessReady, setAccessReady] = useState(mockMode);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -53,6 +55,7 @@ export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<
   const [calendarId, setCalendarId] = useState("");
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [schedules, setSchedules] = useState<ProjectRoadmapSchedule[]>([]);
+  const [quarterPlans, setQuarterPlans] = useState<ProjectQuarterPlan[]>([]);
   const [view, setView] = useState<PlanningView>(initialView);
   const [loading, setLoading] = useState(!mockMode);
   const [authAttempt, setAuthAttempt] = useState(0);
@@ -61,7 +64,7 @@ export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<
   const [errorScope, setErrorScope] = useState<"data" | "calendar">("data");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId || null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [dropSprint, setDropSprint] = useState<number | null>(null);
@@ -98,9 +101,9 @@ export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<
       if (!current) return;
       setLoading(true); setError(""); setErrorScope("data");
       try {
-        const [nextProjects, nextSquads, nextEfforts, nextCalendars] = await withTimeout(Promise.all([projectRepository.list(), squadRepository.list(), effortRepository.list(), sprintRepository.listCalendars()]), "Loading Planning data");
+        const [nextProjects, nextSquads, nextEfforts, nextCalendars, nextQuarterPlans] = await withTimeout(Promise.all([projectRepository.list(), squadRepository.list(), effortRepository.list(), sprintRepository.listCalendars(), quarterPlanRepository.list()]), "Loading Planning data");
         if (!current) return;
-        setProjects(nextProjects); setSquads(nextSquads); setEfforts(nextEfforts); setCalendars(nextCalendars.filter((calendar) => calendar.active));
+        setProjects(nextProjects); setSquads(nextSquads); setEfforts(nextEfforts); setCalendars(nextCalendars.filter((calendar) => calendar.active)); setQuarterPlans(nextQuarterPlans);
         const stored = loadSelectedCalendarId();
         if (stored && nextCalendars.some((calendar) => calendar.id === stored && calendar.active)) setCalendarId(stored);
       } catch (caught) { if (current) setError(messageFrom(caught)); }
@@ -108,7 +111,7 @@ export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<
     }
     void loadRepositoryData();
     return () => { current = false; };
-  }, [accessReady, dataAttempt, effortRepository, mockMode, projectRepository, session, sprintRepository, squadRepository]);
+  }, [accessReady, dataAttempt, effortRepository, mockMode, projectRepository, quarterPlanRepository, session, sprintRepository, squadRepository]);
 
   useEffect(() => {
     if (!calendarId) return;
@@ -172,6 +175,7 @@ export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<
     <header className="pb-5"><h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[var(--ink)] sm:text-4xl">Planning</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">Schedule projects and review Squad capacity. Project details and effort stay in Projects.</p></header>
     {error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="mr-auto">{error}</span><button onClick={() => { setError(""); if (errorScope === "calendar") setCalendarAttempt((current) => current + 1); else setDataAttempt((current) => current + 1); }} className="rounded-md border border-red-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
     <div role="tablist" aria-label="Planning sections" className="flex w-full gap-1 overflow-x-auto border-b border-[var(--border)]">{(["roadmap", "capacity"] as const).map((tab) => <button key={tab} role="tab" onClick={() => changeView(tab)} aria-selected={view === tab} className={`min-h-11 shrink-0 border-b-2 px-4 text-sm font-bold transition-colors ${view === tab ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"}`}>{tab === "roadmap" ? "Roadmap & Sprint Calendar" : "Squad Capacity"}</button>)}</div>
+    {view === "roadmap" && <QuarterlyRoadmap client={client} mockMode={mockMode} projects={projects} plans={quarterPlans} initialProjectId={initialProjectId} onPlansChange={setQuarterPlans} />}
     {(view === "roadmap" || view === "capacity") && <section className="mt-5 flex flex-wrap items-end gap-4 border-b border-[var(--border)] pb-5"><div className="mr-auto"><h2 className="text-sm font-bold text-[var(--ink)]">Sprint calendar</h2><p className="mt-1 text-xs text-[var(--muted)]">Used by Roadmap and Squad Capacity.</p></div><label className="text-xs font-bold text-[#60675e]">Calendar<select aria-label="Sprint calendar" value={calendarId} onChange={(event) => void selectCalendar(event.target.value)} className="control mt-1 block min-w-64 px-3 text-sm font-semibold"><option value="">Select a calendar</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.display_name} · {calendar.baseline_start_date}</option>)}</select></label></section>}
     {view === "roadmap" && <SprintCalendarSetup repository={sprintRepository} schedules={schedules.filter((item) => item.archived_at === null).length} capacityPeriods={0} onCreated={(calendar, createdSprints) => { setCalendars((value) => [...value, calendar]); setCalendarId(calendar.id); setSprints(createdSprints); setSchedules([]); }} />}
     {view === "capacity" && <CapacityPlanning planning={planning} calendarId={calendarId} calendarName={calendars.find((calendar) => calendar.id === calendarId)?.display_name ?? ""} mockMode={mockMode} />}

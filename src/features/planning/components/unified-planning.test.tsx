@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   calendarList: vi.fn(),
   sprintList: vi.fn(),
   scheduleList: vi.fn(),
+  quarterPlanList: vi.fn(),
 }));
 
 vi.mock("../../../lib/supabase/client", () => ({
@@ -25,6 +26,7 @@ vi.mock("../../resource-capacity/repositories", () => ({
   createProjectSquadEffortRepository: () => ({ list: mocks.effortList }),
   createSprintRepository: () => ({ listCalendars: mocks.calendarList, listSprints: mocks.sprintList }),
   createProjectRoadmapScheduleRepository: () => ({ list: mocks.scheduleList }),
+  createProjectQuarterPlanRepository: () => ({ list: mocks.quarterPlanList }),
 }));
 
 const session = { access_token: "test", user: { id: "10000000-0000-4000-8000-000000000001" } };
@@ -49,6 +51,7 @@ describe("UnifiedPlanning loading recovery", () => {
     mocks.calendarList.mockResolvedValue([]);
     mocks.sprintList.mockResolvedValue([]);
     mocks.scheduleList.mockResolvedValue([]);
+    mocks.quarterPlanList.mockResolvedValue([]);
   });
 
   afterEach(() => {

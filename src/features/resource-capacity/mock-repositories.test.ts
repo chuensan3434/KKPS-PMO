@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockScheduleRepository, createMockSquadRepository } from "./mock-repositories";
+import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockQuarterPlanRepository, createMockScheduleRepository, createMockSquadRepository } from "./mock-repositories";
 
 beforeEach(() => window.localStorage.clear());
 
@@ -34,5 +34,11 @@ describe("local mock data repositories", () => {
     expect(await createMockScheduleRepository().list(schedule.calendar_id)).toContainEqual(schedule);
     expect(localStorage.getItem("kkps-pmo:roadmap-planning:v1")).toBe("legacy-roadmap");
     expect(localStorage.getItem("kkps-pmo:effort-estimation:v1")).toBe("legacy-estimation");
+  });
+
+  it("persists quarter intent separately from Sprint schedules", async () => {
+    const plan = await createMockQuarterPlanRepository().create({ project_id: "30000000-0000-4000-8000-000000000001", planned_year: 2027, start_quarter: 1, end_quarter: 3 });
+    expect(await createMockQuarterPlanRepository().list(2027)).toContainEqual(plan);
+    expect(await createMockScheduleRepository().list("10000000-0000-4000-8000-000000000001")).toEqual([]);
   });
 });

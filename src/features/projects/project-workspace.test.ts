@@ -35,4 +35,8 @@ describe("getProjectNextStep", () => {
     expect(getProjectNextStep(project, [effort])).toBe("Ready for Planning");
     expect(getProjectNextStep(project, [{ ...effort, archived_at: project.updated_at }])).toBe("Needs Estimation");
   });
+
+  it("shows planned when an active quarterly plan exists", () => {
+    expect(getProjectNextStep(project, [], [{ id: "40000000-0000-4000-8000-000000000001", project_id: project.id, planned_year: 2027, start_quarter: 1, end_quarter: 2, archived_at: null, created_at: project.created_at, updated_at: project.updated_at }])).toBe("Planned");
+  });
 });

@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { isLocalMockDataMode } from "../../lib/development-mode";
-import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockScheduleRepository, createMockSprintRepository, createMockSquadRepository } from "./mock-repositories";
+import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockQuarterPlanRepository, createMockScheduleRepository, createMockSprintRepository, createMockSquadRepository } from "./mock-repositories";
 import {
   personCreateSchema,
   personSchema,
   personUpdateSchema,
   projectCreateSchema,
+  projectQuarterPlanCreateSchema,
+  projectQuarterPlanSchema,
+  projectQuarterPlanUpdateSchema,
   projectRoadmapScheduleCreateSchema,
   projectRoadmapScheduleSchema,
   projectRoadmapScheduleUpdateSchema,
@@ -365,6 +368,41 @@ export function createProjectRoadmapScheduleRepository(client: MockableRepositor
       const { data, error } = await client.from("project_roadmap_schedules").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
       databaseError(operation, error);
       return parseRow(operation, projectRoadmapScheduleSchema, data);
+    },
+  };
+}
+
+export function createProjectQuarterPlanRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockQuarterPlanRepository();
+  if (!client) throw new ResourceRepositoryError("Create quarter-plan repository", "Supabase client is required outside Demo Mode.");
+  return {
+    async list(year?: number) {
+      const operation = "List project quarter plans";
+      let query = client.from("project_quarter_plans").select("*").order("planned_year").order("start_quarter");
+      if (year) query = query.eq("planned_year", year);
+      const { data, error } = await query;
+      databaseError(operation, error);
+      return parseRows(operation, projectQuarterPlanSchema, data);
+    },
+    async create(input: unknown) {
+      const operation = "Create project quarter plan";
+      const values = validateInput(operation, projectQuarterPlanCreateSchema, input);
+      const { data, error } = await client.from("project_quarter_plans").insert(values).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectQuarterPlanSchema, data);
+    },
+    async update(id: string, input: unknown) {
+      const operation = "Update project quarter plan";
+      const values = validateInput(operation, projectQuarterPlanUpdateSchema, input);
+      const { data, error } = await client.from("project_quarter_plans").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectQuarterPlanSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive project quarter plan";
+      const { data, error } = await client.from("project_quarter_plans").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectQuarterPlanSchema, data);
     },
   };
 }
