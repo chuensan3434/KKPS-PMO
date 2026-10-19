@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CapacityPlanning } from "./capacity-planning";
 import { defaultPlanningState } from "../planning-data";
@@ -14,8 +13,6 @@ const mocks = vi.hoisted(() => ({
   sprintList: vi.fn(),
   projectList: vi.fn(),
   effortList: vi.fn(),
-  periodList: vi.fn(),
-  periodCreate: vi.fn(),
 }));
 
 vi.mock("../../../lib/supabase/client", () => ({
@@ -27,7 +24,10 @@ vi.mock("../../resource-capacity/repositories", () => ({
   createSprintRepository: () => ({ listCalendars: mocks.calendarList, listSprints: mocks.sprintList }),
   createProjectRepository: () => ({ list: mocks.projectList }),
   createProjectSquadEffortRepository: () => ({ list: mocks.effortList }),
-  createSquadCapacityPeriodRepository: () => ({ list: mocks.periodList, create: mocks.periodCreate, update: vi.fn(), archive: vi.fn() }),
+}));
+
+vi.mock("../squad-capacity-repository", () => ({
+  createSquadCapacityPlannerRepository: () => ({ load: vi.fn().mockResolvedValue({ members: [], workTypes: [], rows: [], allocations: [], availability: [] }) }),
 }));
 
 beforeEach(() => {
@@ -40,26 +40,20 @@ beforeEach(() => {
     start.setUTCDate(start.getUTCDate() + index * 14);
     const displayEnd = new Date(start); displayEnd.setUTCDate(displayEnd.getUTCDate() + 11);
     const coverageEnd = new Date(start); coverageEnd.setUTCDate(coverageEnd.getUTCDate() + 13);
-    return { id: `00000000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`, calendar_id: calendarId, sprint_code: `2027-S${index + 1}`, sequence_number: index + 1, start_date: start.toISOString().slice(0, 10), display_end_date: displayEnd.toISOString().slice(0, 10), coverage_end_date: coverageEnd.toISOString().slice(0, 10), created_at: "2026-10-12T00:00:00.000Z", updated_at: "2026-10-12T00:00:00.000Z" };
+    return { id: `00000000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`, calendar_id: calendarId, sprint_code: `2027-S${index + 1}`, sequence_number: index + 1, start_date: start.toISOString().slice(0, 10), display_end_date: displayEnd.toISOString().slice(0, 10), coverage_end_date: coverageEnd.toISOString().slice(0, 10), holiday_adjustment_days: 0, created_at: "2026-10-12T00:00:00.000Z", updated_at: "2026-10-12T00:00:00.000Z" };
   }));
   mocks.projectList.mockResolvedValue([]);
   mocks.effortList.mockResolvedValue([]);
-  mocks.periodList.mockResolvedValue([]);
-  mocks.periodCreate.mockResolvedValue({ id: "00000000-0000-4000-8000-000000000099", squad_id: squadId, calendar_id: calendarId, start_sprint: 1, end_sprint: 2, capacity_md: 20, source: "manual", archived_at: null, created_at: "2026-10-12T00:00:00.000Z", updated_at: "2026-10-12T00:00:00.000Z" });
 });
 
 describe("unified Capacity Planning", () => {
-  it("uses the shared calendar and stable squad IDs without identity mapping UI", async () => {
-    const user = userEvent.setup();
+  it("uses member capacity and removes manual Capacity Period controls", async () => {
     const planning = { ...defaultPlanningState, squads: [{ id: squadId, name: "Supabase Squad", capacityMd: 0 }], projects: [] };
     render(<CapacityPlanning planning={planning} calendarId={calendarId} />);
 
     expect(screen.queryByText(/identity mapping/i)).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Add period" })).toBeEnabled());
-    await user.selectOptions(screen.getByLabelText("Start Sprint"), "1");
-    await user.selectOptions(screen.getByLabelText("End Sprint"), "2");
-    await user.type(screen.getByLabelText("MD per Sprint"), "20");
-    await user.click(screen.getByRole("button", { name: "Add period" }));
-    await waitFor(() => expect(mocks.periodCreate).toHaveBeenCalledWith({ squad_id: squadId, calendar_id: calendarId, start_sprint: 1, end_sprint: 2, capacity_md: 20, source: "manual" }));
+    await waitFor(() => expect(screen.getByText("Not Configured — Add Squad Members")).toBeInTheDocument());
+    expect(screen.queryByLabelText("MD per Sprint")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Capacity Timeline" })).not.toBeInTheDocument();
   });
 });

@@ -17,13 +17,13 @@ function initialStore(): MockStore {
     const start = new Date("2027-01-04T00:00:00.000Z"); start.setUTCDate(start.getUTCDate() + index * 14);
     const displayEnd = new Date(start); displayEnd.setUTCDate(displayEnd.getUTCDate() + 11);
     const coverageEnd = new Date(start); coverageEnd.setUTCDate(coverageEnd.getUTCDate() + 13);
-    return { id: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, calendar_id: calendarId, sprint_code: `2027-S${index + 1}`, sequence_number: index + 1, start_date: start.toISOString().slice(0, 10), display_end_date: displayEnd.toISOString().slice(0, 10), coverage_end_date: coverageEnd.toISOString().slice(0, 10), created_at: created, updated_at: created };
+    return { id: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, calendar_id: calendarId, sprint_code: `2027-S${index + 1}`, sequence_number: index + 1, start_date: start.toISOString().slice(0, 10), display_end_date: displayEnd.toISOString().slice(0, 10), coverage_end_date: coverageEnd.toISOString().slice(0, 10), holiday_adjustment_days: 0, created_at: created, updated_at: created };
   });
   return { squads, projects, efforts: [], calendars, sprints, periods: [], schedules: [] };
 }
 
 function write(store: MockStore) { window.localStorage.setItem(storageKey, JSON.stringify(store)); }
-function read(): MockStore { const value = window.localStorage.getItem(storageKey); if (value) { try { const parsed = JSON.parse(value) as MockStore; return { ...parsed, schedules: parsed.schedules ?? [] }; } catch {} } const store = initialStore(); write(store); return store; }
+function read(): MockStore { const value = window.localStorage.getItem(storageKey); if (value) { try { const parsed = JSON.parse(value) as MockStore; return { ...parsed, schedules: parsed.schedules ?? [], sprints: parsed.sprints.map((sprint) => ({ ...sprint, holiday_adjustment_days: sprint.holiday_adjustment_days ?? 0 })) }; } catch {} } const store = initialStore(); write(store); return store; }
 function change(mutate: (store: MockStore) => void) { const store = read(); mutate(store); write(store); }
 const uuid = () => crypto.randomUUID();
 

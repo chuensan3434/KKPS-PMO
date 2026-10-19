@@ -27,6 +27,7 @@ export function generateSprintPreview(draft: CalendarDraft, calendarId: string, 
     return {
       id: prior?.id ?? crypto.randomUUID(), calendar_id: calendarId, sprint_code: `${draft.year}-S${index + 1}`,
       sequence_number: index + 1, start_date: iso(start), display_end_date: iso(end), coverage_end_date: iso(end),
+      holiday_adjustment_days: prior?.holiday_adjustment_days ?? 0,
       created_at: prior?.created_at ?? now, updated_at: now,
     };
   });
@@ -53,9 +54,24 @@ export function countWeekdays(startDate: string, endDate: string) {
   return count;
 }
 
+export function effectiveWorkingDays(sprint: Sprint) {
+  return Math.max(0, countWeekdays(sprint.start_date, sprint.display_end_date) - sprint.holiday_adjustment_days);
+}
+
+export function validateHolidayAdjustment(sprint: Sprint, value: number) {
+  const base = countWeekdays(sprint.start_date, sprint.display_end_date);
+  if (!Number.isInteger(value) || value < 0 || value > base) return `Holiday / Non-working Days must be a whole number from 0 to ${base}.`;
+  return "";
+}
+
 export function availableMd(memberId: string, sprint: Sprint, availability: MemberAvailability[]) {
   const factor = (availability.find((item) => item.member_id === memberId && item.sprint_id === sprint.id)?.availability_pct ?? 100) / 100;
-  return countWeekdays(sprint.start_date, sprint.display_end_date) * factor;
+  return effectiveWorkingDays(sprint) * factor;
+}
+
+export function squadCapacity(data: PlannerData, squadId: string, sprints: Sprint[]) {
+  const members = data.members.filter((member) => member.squad_id === squadId && member.active);
+  return sprints.map((sprint) => members.length === 0 ? null : members.reduce((sum, member) => sum + effectiveWorkingDays(sprint) * member.default_availability_pct / 100, 0));
 }
 
 export function employeeTotals(data: PlannerData, sprints: Sprint[], allRows = data.rows) {
@@ -75,8 +91,7 @@ export function workloadMix(data: PlannerData, sprints: Sprint[]) {
       const row = activeRows.find((item) => item.id === allocation.row_id);
       if (!row) continue;
       const defaultPct = data.members.find((item) => item.id === row.member_id)?.default_availability_pct ?? 100;
-      const override = data.availability.find((item) => item.member_id === row.member_id && item.sprint_id === sprint.id)?.availability_pct;
-      const md = countWeekdays(sprint.start_date, sprint.display_end_date) * (override ?? defaultPct) / 100 * allocation.allocation_pct / 100;
+      const md = effectiveWorkingDays(sprint) * defaultPct / 100 * allocation.allocation_pct / 100;
       mdByType.set(row.work_type_id, (mdByType.get(row.work_type_id) ?? 0) + md);
     }
     const totalMd = [...mdByType.values()].reduce((sum, value) => sum + value, 0);

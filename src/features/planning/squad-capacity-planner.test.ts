@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countWeekdays, employeeTotals, generateSprintPreview, sortAllocationRows, validateSprintDates, workloadMix, type PlannerData } from "./squad-capacity-planner";
+import { countWeekdays, effectiveWorkingDays, employeeTotals, generateSprintPreview, sortAllocationRows, squadCapacity, validateHolidayAdjustment, validateSprintDates, workloadMix, type PlannerData } from "./squad-capacity-planner";
 
 const calendarId = "10000000-0000-4000-8000-000000000001";
 const sprints = generateSprintPreview({ year: 2027, firstStart: "2027-01-04", durationWeeks: 2, sprintCount: 2 }, calendarId);
@@ -16,6 +16,15 @@ describe("shared Sprint Calendar", () => {
   it("rejects invalid input and detects irregular overlaps", () => {
     expect(() => generateSprintPreview({ year: 2027, firstStart: "2026-12-28", durationWeeks: 2, sprintCount: 26 }, calendarId)).toThrow(/planning year/i);
     expect(validateSprintDates([{ ...sprints[0], display_end_date: "2027-01-20" }, sprints[1]])).toMatch(/overlap/i);
+  });
+
+  it("subtracts validated global non-working weekdays without going negative", () => {
+    const sprint = { ...sprints[0], holiday_adjustment_days: 2 };
+    expect(countWeekdays(sprint.start_date, sprint.display_end_date)).toBe(10);
+    expect(effectiveWorkingDays(sprint)).toBe(8);
+    expect(validateHolidayAdjustment(sprint, 0)).toBe("");
+    expect(validateHolidayAdjustment(sprint, 10)).toBe("");
+    expect(validateHolidayAdjustment(sprint, 11)).toMatch(/0 to 10/);
   });
 });
 
@@ -46,9 +55,17 @@ describe("allocation calculations", () => {
 
   it("weights workload mix by available MD and keeps empty Sprints empty", () => {
     const result = workloadMix(data, sprints);
-    expect(result[0].mix.get("dev")).toBeCloseTo(60 / (60 + 50 + 25) * 100);
+    expect(result[0].mix.get("dev")).toBeCloseTo(60 / (60 + 50 + 50) * 100);
     expect(result[1].totalMd).toBe(0);
     expect(result[1].mix.size).toBe(0);
+  });
+
+  it("distinguishes no members from zero effective working days and applies default availability", () => {
+    expect(squadCapacity(data, "missing", sprints)).toEqual([null, null]);
+    const zeroDays = [{ ...sprints[0], holiday_adjustment_days: 10 }];
+    expect(squadCapacity(data, "squad-a", zeroDays)).toEqual([0]);
+    const withPartTime = { ...data, members: data.members.map((member) => member.id === "member-b" ? { ...member, default_availability_pct: 50 } : member) };
+    expect(squadCapacity(withPartTime, "squad-a", [sprints[0]])).toEqual([15]);
   });
 
   it("sorts without mutating row identity", () => {

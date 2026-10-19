@@ -85,6 +85,7 @@ export const sprintSchema = z.object({
   start_date: isoDate,
   display_end_date: isoDate,
   coverage_end_date: isoDate,
+  holiday_adjustment_days: z.number().int().nonnegative().default(0),
   created_at: timestamp,
   updated_at: timestamp,
 });
