@@ -70,3 +70,21 @@ export function createMockScheduleRepository() { return {
   async update(recordId: string, input: unknown) { const values = projectRoadmapScheduleUpdateSchema.parse(input); let result!: ProjectRoadmapSchedule; change((store) => { store.schedules = store.schedules.map((record) => record.id === recordId ? (result = { ...record, ...values, updated_at: now() }) : record); }); return result; },
   async archive(recordId: string) { let result!: ProjectRoadmapSchedule; change((store) => { store.schedules = store.schedules.map((record) => record.id === recordId ? (result = { ...record, archived_at: now(), updated_at: now() }) : record); }); return result; },
 }; }
+
+export function importMockProjectsWithEfforts(payload: Array<{ project_name: string; description: string | null; business_unit: string | null; owner_name: string | null; target_date: string | null; status: "draft"; efforts: Array<{ squad_id: string; dev_md: number; qa_md: number }> }>) {
+  let createdProjects = 0, createdEfforts = 0, skippedProjects = 0;
+  change((store) => {
+    const activeNames = new Set(store.projects.filter((project) => project.archived_at === null).map((project) => project.project_name.trim().toLocaleLowerCase()));
+    const activeSquads = new Set(store.squads.filter((squad) => squad.active).map((squad) => squad.id));
+    for (const item of payload) {
+      const name = item.project_name.trim(), normalized = name.toLocaleLowerCase();
+      if (activeNames.has(normalized)) { skippedProjects += 1; continue; }
+      if (item.efforts.some((effort) => !activeSquads.has(effort.squad_id))) throw new Error("An imported effort references an unknown or inactive Squad.");
+      const timestamp = now(), projectId = uuid();
+      store.projects.push({ id: projectId, project_name: name, description: item.description, business_unit: item.business_unit, owner_name: item.owner_name, target_date: item.target_date, status: item.status, metadata: {}, archived_at: null, created_at: timestamp, updated_at: timestamp });
+      item.efforts.forEach((effort) => store.efforts.push({ id: uuid(), project_id: projectId, ...effort, archived_at: null, created_at: timestamp, updated_at: timestamp }));
+      activeNames.add(normalized); createdProjects += 1; createdEfforts += item.efforts.length;
+    }
+  });
+  return { created_projects: createdProjects, created_efforts: createdEfforts, skipped_projects: skippedProjects };
+}

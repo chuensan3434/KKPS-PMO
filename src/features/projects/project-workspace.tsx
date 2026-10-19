@@ -8,6 +8,7 @@ import { createClient } from "../../lib/supabase/client";
 import { isLocalMockDataMode } from "../../lib/development-mode";
 import type { Project, ProjectSquadEffort, Squad } from "../resource-capacity/domain";
 import { createProjectRepository, createProjectSquadEffortRepository, createSquadRepository } from "../resource-capacity/repositories";
+import { ProjectImportDialog } from "./project-import-dialog";
 
 type ProjectForm = {
   project_name: string;
@@ -35,6 +36,7 @@ export function ProjectWorkspace({ mockMode = isLocalMockDataMode, initialProjec
   const [projects, setProjects] = useState<Project[]>([]), [squads, setSquads] = useState<Squad[]>([]), [efforts, setEfforts] = useState<ProjectSquadEffort[]>([]);
   const [selectedId, setSelectedId] = useState(initialProjectId), [search, setSearch] = useState(""), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [editing, setEditing] = useState(false), [creating, setCreating] = useState(false), [saving, setSaving] = useState(false), [form, setForm] = useState<ProjectForm>(emptyForm);
+  const [showImport, setShowImport] = useState(false), [imported, setImported] = useState(false);
 
   useEffect(() => {
     if (mockMode || !client) return;
@@ -87,12 +89,12 @@ export function ProjectWorkspace({ mockMode = isLocalMockDataMode, initialProjec
   if (!mockMode && !session) return <SignIn client={client!} error={error} />;
 
   return <PageContainer eyebrow="Project workflow" title="Projects" description="Create a project, estimate Squad effort, then open it in Planning.">
-    <div className="mb-5 flex flex-wrap items-center gap-3"><button type="button" onClick={startCreate} className="min-h-11 rounded-xl bg-[var(--ink)] px-5 text-sm font-bold text-white">New Project</button><p className="text-sm text-[var(--muted)]">Select one project to view its details and effort.</p></div>
+    <div className="mb-5 flex flex-wrap items-center gap-3"><button type="button" onClick={startCreate} className="min-h-11 rounded-xl bg-[var(--ink)] px-5 text-sm font-bold text-white">New Project</button><button type="button" onClick={() => setShowImport(true)} className="control min-h-11 px-4 text-sm font-bold">Import Excel</button><p className="text-sm text-[var(--muted)]">Select one project to view its details and effort.</p></div>
     {error && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     <div className="grid min-h-[620px] gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="surface overflow-hidden" aria-label="Project list"><div className="border-b border-[var(--border)] p-4"><label className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--muted)]">Search<input aria-label="Search projects" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Project name" className="control mt-2 w-full px-3 text-sm font-medium normal-case tracking-normal" /></label></div><ul className="max-h-[680px] overflow-y-auto">{visibleProjects.map((project) => { const active = project.id === selectedId; return <li key={project.id} className="border-b border-[var(--border)] last:border-0"><button type="button" onClick={() => selectProject(project.id)} aria-current={active ? "true" : undefined} className={`w-full px-4 py-4 text-left ${active ? "bg-[#f5f9d7]" : "hover:bg-[var(--surface-subtle)]"}`}><span className="block font-extrabold text-[var(--ink)]">{project.project_name}</span><span className="mt-1 block text-xs font-semibold text-[var(--muted)]">{getProjectNextStep(project, efforts)}</span></button></li>; })}</ul>{visibleProjects.length === 0 && <p className="p-6 text-center text-sm text-[var(--muted)]">No projects match your search.</p>}</aside>
       <main className="min-w-0">{editing ? <ProjectFormPanel form={form} creating={creating} saving={saving} onChange={setForm} onSubmit={saveProject} onCancel={() => { setEditing(false); setCreating(false); if (!selectedId) setSelectedId(activeProjects[0]?.id ?? ""); }} /> : selected ? <ProjectDetail project={selected} efforts={selectedEfforts} allEfforts={efforts} squads={squads} effortRepository={effortRepository} onEffortsChange={setEfforts} onEdit={() => startEdit(selected)} onArchive={() => void archiveProject()} /> : <section className="surface grid min-h-64 place-items-center p-8 text-center"><div><h2 className="text-xl font-extrabold">Create your first project</h2><p className="mt-2 text-sm text-[var(--muted)]">Project name is the only required field.</p><button onClick={startCreate} className="mt-5 min-h-11 rounded-xl bg-[var(--ink)] px-5 text-sm font-bold text-white">New Project</button></div></section>}</main>
-    </div>
+    </div>{showImport && <ProjectImportDialog client={client} mockMode={mockMode} projects={projects} squads={squads} onImported={() => setImported(true)} onClose={() => { setShowImport(false); if (imported) window.location.reload(); }} />}
   </PageContainer>;
 }
 
