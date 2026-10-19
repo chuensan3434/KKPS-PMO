@@ -27,7 +27,7 @@ function statusLabel(status: Project["status"]) {
   return status.replace("_", " ");
 }
 
-export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ mockMode?: boolean }>) {
+export function ProjectMaster({ mockMode = isLocalMockDataMode, embeddedView }: Readonly<{ mockMode?: boolean; embeddedView?: "projects" | "squads" }>) {
   const supabase = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const repository = useMemo(() => createProjectRepository(supabase, mockMode), [mockMode, supabase]);
   const [session, setSession] = useState<Session | null>(null);
@@ -44,7 +44,7 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
   const [form, setForm] = useState<ProjectForm>(emptyForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<"projects" | "effort" | "squads">("effort");
+  const [workspaceView, setWorkspaceView] = useState<"projects" | "effort" | "squads">(embeddedView ?? "effort");
 
   useEffect(() => {
     if (mockMode) return;
@@ -201,13 +201,10 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
     );
   }
 
-  return (
-    <PageContainer eyebrow="Portfolio workspace" title="Project & Effort Planning" description={mockMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {mockMode ? <p className="text-sm font-medium text-amber-800">Demo Mode — Data saved in this browser</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
-      </div>
+  const content = <>
+      {!embeddedView && !mockMode ? <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></div> : null}
 
-      <div role="tablist" aria-label="Project planning sections" className="surface mt-6 flex flex-wrap gap-1 p-1">
+      {!embeddedView ? <div role="tablist" aria-label="Project planning sections" className="surface mt-6 flex flex-wrap gap-1 p-1">
         {([
           ["effort", "Effort Planning"],
           ["projects", "Project Master"],
@@ -215,10 +212,10 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
         ] as const).map(([value, label]) => (
           <button key={value} type="button" role="tab" aria-selected={workspaceView === value} onClick={() => setWorkspaceView(value)} className={`min-h-10 rounded-xl px-4 text-sm font-bold ${workspaceView === value ? "bg-[var(--accent)] text-[var(--ink)]" : "text-[var(--muted)] hover:bg-[var(--surface-subtle)]"}`}>{label}</button>
         ))}
-      </div>
+      </div> : null}
 
       {workspaceView === "effort" ? <div className="mt-6"><EffortPlanning mockMode={mockMode} /></div> : null}
-      {workspaceView === "squads" ? <div className="mt-6"><SquadManagement mockMode={mockMode} /></div> : null}
+      {workspaceView === "squads" ? <div className={embeddedView ? "mt-6" : "mt-6"}><SquadManagement mockMode={mockMode} /></div> : null}
       {workspaceView === "projects" ? <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <section aria-labelledby="project-list-heading" className="surface min-w-0 overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -286,6 +283,8 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
           </form>
         </section>
       </div> : null}
-    </PageContainer>
-  );
+    </>;
+
+  if (embeddedView) return content;
+  return <PageContainer title="Project & Effort Planning" description={mockMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>{content}</PageContainer>;
 }

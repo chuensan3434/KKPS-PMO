@@ -4,15 +4,21 @@ const projectId = "30000000-0000-4000-8000-000000000001";
 
 async function selectCalendar(page: Page) {
   await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
-  await expect(page.getByText(/Compatible · 26 Sprints/)).toBeVisible();
+  await expect(page.getByText("S26", { exact: true }).first()).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/planning");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Roadmap Planning" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Planning" })).toBeVisible();
   await selectCalendar(page);
+});
+
+test("redirects the legacy Projects route to the canonical Planning workspace", async ({ page }) => {
+  await page.goto("/projects?view=squads");
+  await expect(page).toHaveURL(/\/planning\?view=squads$/);
+  await expect(page.getByRole("tab", { name: "Squad Management" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("loads Project Master records, schedules, persists after refresh, and unschedules without changing effort", async ({ page }) => {
@@ -46,17 +52,16 @@ test("moves, extends, and shrinks a schedule on whole-Sprint boundaries", async 
 });
 
 test("a newly created Project appears once in the Roadmap backlog", async ({ page }) => {
-  await page.getByRole("link", { name: "Projects" }).click();
   await page.getByRole("tab", { name: "Project Master" }).click();
   await page.getByLabel("Project name").fill("Unified New Project");
   await page.getByRole("button", { name: "Create project" }).click();
   await expect(page.getByRole("heading", { name: "Unified New Project" })).toHaveCount(1);
-  await page.getByRole("link", { name: "Planning" }).click();
+  await page.getByRole("tab", { name: "Roadmap" }).click();
   await expect(page.getByRole("heading", { name: "Unified New Project" })).toHaveCount(1);
 });
 
 test("edits project-first effort estimates and preserves canonical demand data in Demo Mode", async ({ page }) => {
-  await page.getByRole("button", { name: "Effort Estimation" }).click();
+  await page.getByRole("tab", { name: "Effort Estimation" }).click();
   await expect(page.getByRole("heading", { name: "Effort Estimation" })).toBeVisible();
   await page.getByLabel("Search projects").fill("crm");
   await expect(page.getByRole("row", { name: /CRM Enhancement/ })).toBeVisible();
@@ -74,24 +79,24 @@ test("edits project-first effort estimates and preserves canonical demand data i
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("row").filter({ hasText: "CRM Enhancement" }).first()).toContainText("17");
   await page.reload();
-  await page.getByRole("button", { name: "Effort Estimation" }).click();
+  await page.getByRole("tab", { name: "Effort Estimation" }).click();
   await page.getByRole("row").filter({ hasText: "CRM Enhancement" }).first().getByRole("button", { name: "Expand" }).click();
   await expect(page.getByLabel("CRM Enhancement Squad Alpha Dev MD")).toHaveValue("12.5");
-  await page.getByRole("button", { name: "Roadmap" }).click();
+  await page.getByRole("tab", { name: "Roadmap" }).click();
   await expect(page.locator("article").filter({ hasText: "CRM Enhancement" }).first()).toContainText("17 MD");
 });
 
 test("member capacity is the only active source and Capacity Timeline stays in Roadmap", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toBeVisible();
   await expect(page.getByText("Not Configured", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await page.getByRole("tab", { name: "Squad Capacity" }).click();
   await expect(page.getByText(/identity mapping/i)).toHaveCount(0);
   await expect(page.getByLabel("MD per Sprint")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toHaveCount(0);
 });
 
 test("completes planner interactions and persists them in Demo Mode", async ({ page }) => {
-  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await page.getByRole("tab", { name: "Squad Capacity" }).click();
   await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
   await page.getByText("Manage Squad Members", { exact: true }).click();
   await page.getByLabel("New member name").fill("Demo Member");
@@ -108,7 +113,8 @@ test("completes planner interactions and persists them in Demo Mode", async ({ p
   await page.getByRole("button", { name: "Add Row" }).click();
   await page.getByLabel("Demo Member SA S1", { exact: true }).fill("50");
   await expect(page.getByRole("row", { name: /Total allocated 110%/ })).toBeVisible();
-  await page.getByRole("button", { name: "Copy" }).first().click();
+  await page.getByLabel("Actions for Dev, Demo Member").click();
+  await page.getByRole("button", { name: "Copy allocation" }).click();
   await page.getByLabel("Copy source Sprint").selectOption({ label: "S1" });
   await page.getByLabel("Copy destination start").fill("2");
   await page.getByLabel("Copy destination end").fill("3");
@@ -119,7 +125,7 @@ test("completes planner interactions and persists them in Demo Mode", async ({ p
   await expect(page.getByLabel("Demo Member Dev S1", { exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-\[#f5f9d7\]/);
   await page.reload();
   await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
-  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await page.getByRole("tab", { name: "Squad Capacity" }).click();
   await expect(page.getByLabel("Demo Member Dev S3", { exact: true })).toHaveValue("60");
   await expect(page.getByRole("heading", { name: "Manage Capacity Periods" })).toHaveCount(0);
 });
@@ -135,13 +141,13 @@ test("previews individual Sprint adjustment and creates a separate calendar vers
   await expect(page.getByLabel("S3 Holiday / Non-working Days").locator("xpath=ancestor::tr")).toContainText("8");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Confirm and create calendar version" }).click();
-  await expect(page.getByText("Compatible · 3 Sprints")).toBeVisible();
+  await expect(page.getByText("S3", { exact: true }).first()).toBeVisible();
   await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
-  await expect(page.getByText("Compatible · 26 Sprints")).toBeVisible();
+  await expect(page.getByText("S26", { exact: true }).first()).toBeVisible();
 });
 
 test("one global non-working-day adjustment recalculates member capacity for every squad", async ({ page }) => {
-  await page.getByRole("button", { name: "Squad Capacity Planner" }).click();
+  await page.getByRole("tab", { name: "Squad Capacity" }).click();
   await page.getByText("Manage Squad Members", { exact: true }).click();
   await page.getByLabel("New member name").fill("Alpha Member");
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
@@ -149,7 +155,7 @@ test("one global non-working-day adjustment recalculates member capacity for eve
   await page.getByLabel("New member name").fill("Beta Member");
   await page.getByRole("button", { name: "Add", exact: true }).first().click();
   await page.getByLabel("Beta Member default availability").fill("50");
-  await page.getByRole("button", { name: "Roadmap" }).click();
+  await page.getByRole("tab", { name: "Roadmap" }).click();
   await page.getByRole("button", { name: "Sprint Calendar Setup" }).click();
   await page.getByLabel("Sprint count").fill("1");
   await page.getByLabel("S1 Holiday / Non-working Days").fill("2");

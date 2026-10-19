@@ -16,9 +16,11 @@ import { CapacityPlanning } from "./capacity-planning";
 import { EffortEstimation } from "./effort-estimation";
 import { SprintCalendarSetup } from "./sprint-calendar-setup";
 import { RoadmapCapacityTimeline } from "./roadmap-capacity-timeline";
+import { ProjectMaster } from "../../resource-capacity/project-master";
 
 const sprintWidth = 112;
 const requestTimeoutMs = 10_000;
+export type PlanningView = "roadmap" | "estimation" | "capacity" | "projects" | "squads";
 
 function messageFrom(error: unknown) {
   const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : "Something went wrong.";
@@ -37,7 +39,7 @@ function withTimeout<T>(request: Promise<T>, label: string) {
   });
 }
 
-export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
+export function UnifiedPlanning({ mockMode, initialView = "roadmap" }: Readonly<{ mockMode: boolean; initialView?: PlanningView }>) {
   const client = useMemo(() => mockMode ? null : createClient(), [mockMode]);
   const projectRepository = useMemo(() => createProjectRepository(client, mockMode), [client, mockMode]);
   const squadRepository = useMemo(() => createSquadRepository(client, mockMode), [client, mockMode]);
@@ -53,7 +55,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   const [calendarId, setCalendarId] = useState("");
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [schedules, setSchedules] = useState<ProjectRoadmapSchedule[]>([]);
-  const [view, setView] = useState<"roadmap" | "estimation" | "capacity">("roadmap");
+  const [view, setView] = useState<PlanningView>(initialView);
   const [loading, setLoading] = useState(!mockMode);
   const [authAttempt, setAuthAttempt] = useState(0);
   const [dataAttempt, setDataAttempt] = useState(0);
@@ -66,6 +68,14 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [dropSprint, setDropSprint] = useState<number | null>(null);
   const timelineBodyRef = useRef<HTMLDivElement>(null);
+
+  function changeView(next: typeof view) {
+    setView(next);
+    if (next === "roadmap" || next === "estimation") setDataAttempt((current) => current + 1);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", next);
+    window.history.replaceState(null, "", url);
+  }
 
   useEffect(() => {
     if (mockMode) return;
@@ -160,14 +170,16 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   if (loading && projects.length === 0 && !error) return <div className="px-4 py-12 text-sm text-slate-500">Loading unified planning workspace…</div>;
   if (!mockMode && accessReady && !session) return <div className="px-4 py-12"><h1 className="text-2xl font-bold">Supabase session required</h1><p role="alert" className="mt-2 text-slate-600">{error || "Sign in from Projects before opening unified Planning."}</p><button onClick={() => { setError(""); setAccessReady(false); setLoading(true); setAuthAttempt((current) => current + 1); }} className="mt-4 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700">Retry authentication</button></div>;
 
-  return <div className="mx-auto w-full max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-    <header className="pb-5"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--success)]">Planning workspace</p><h1 className="mt-2 text-3xl font-extrabold tracking-[-0.035em] text-[var(--ink)] sm:text-4xl">Roadmap Planning</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)] sm:text-base">Coordinate projects, Squads, shared Sprint dates, member capacity, and demand from one planning workspace.</p></header>
+  return <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <header className="pb-5"><h1 className="text-3xl font-extrabold tracking-[-0.035em] text-[var(--ink)] sm:text-4xl">Planning</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">Plan projects, effort, and Squad capacity in one workspace.</p></header>
     {error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span className="mr-auto">{error}</span><button onClick={() => { setError(""); if (errorScope === "calendar") setCalendarAttempt((current) => current + 1); else setDataAttempt((current) => current + 1); }} className="rounded-md border border-red-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
-    <section className="surface mt-2 flex flex-wrap items-end gap-4 p-4 sm:p-5"><div className="mr-auto"><h2 className="text-sm font-bold text-[var(--ink)]">Planning calendar</h2><p className="mt-1 text-xs text-[var(--muted)]">Shared by Roadmap and Squad Capacity Planner.</p></div><label className="text-xs font-bold uppercase tracking-[0.08em] text-[#60675e]">Sprint calendar<select aria-label="Sprint calendar" value={calendarId} onChange={(event) => void selectCalendar(event.target.value)} className="control mt-1 block min-w-64 px-3 text-sm font-semibold normal-case tracking-normal"><option value="">Select a calendar</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.display_name} · {calendar.baseline_start_date}</option>)}</select></label>{calendarId && sprints.length > 0 && <p className="rounded-full bg-[#edf4e8] px-3 py-2 text-xs font-bold text-[var(--success)]">Compatible · {sprints.length} Sprints</p>}</section>
+    <div role="tablist" aria-label="Planning sections" className="flex w-full gap-1 overflow-x-auto border-b border-[var(--border)]">{(["roadmap", "estimation", "capacity", "projects", "squads"] as const).map((tab) => <button key={tab} role="tab" onClick={() => changeView(tab)} aria-selected={view === tab} className={`min-h-11 shrink-0 border-b-2 px-4 text-sm font-bold transition-colors ${view === tab ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"}`}>{tab === "roadmap" ? "Roadmap" : tab === "estimation" ? "Effort Estimation" : tab === "capacity" ? "Squad Capacity" : tab === "projects" ? "Project Master" : "Squad Management"}</button>)}</div>
+    {(view === "roadmap" || view === "capacity") && <section className="mt-5 flex flex-wrap items-end gap-4 border-b border-[var(--border)] pb-5"><div className="mr-auto"><h2 className="text-sm font-bold text-[var(--ink)]">Sprint calendar</h2><p className="mt-1 text-xs text-[var(--muted)]">Used by Roadmap and Squad Capacity.</p></div><label className="text-xs font-bold text-[#60675e]">Calendar<select aria-label="Sprint calendar" value={calendarId} onChange={(event) => void selectCalendar(event.target.value)} className="control mt-1 block min-w-64 px-3 text-sm font-semibold"><option value="">Select a calendar</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.display_name} · {calendar.baseline_start_date}</option>)}</select></label></section>}
     {view === "roadmap" && <SprintCalendarSetup repository={sprintRepository} schedules={schedules.filter((item) => item.archived_at === null).length} capacityPeriods={0} onCreated={(calendar, createdSprints) => { setCalendars((value) => [...value, calendar]); setCalendarId(calendar.id); setSprints(createdSprints); setSchedules([]); }} />}
-    <div className="mt-5 flex w-full gap-1 overflow-x-auto rounded-xl border border-[var(--border)] bg-white p-1 sm:w-fit">{(["roadmap", "estimation", "capacity"] as const).map((tab) => <button key={tab} onClick={() => setView(tab)} aria-pressed={view === tab} className={`min-h-10 shrink-0 rounded-lg px-4 text-sm font-bold transition-colors ${view === tab ? "bg-[var(--accent)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:bg-[#f1f2ee] hover:text-[var(--ink)]"}`}>{tab === "roadmap" ? "Roadmap" : tab === "estimation" ? "Effort Estimation" : "Squad Capacity Planner"}</button>)}</div>
     <div hidden={view !== "estimation"} className="mt-6"><EffortEstimation client={client} mockMode={mockMode} projects={projects} squads={squads} efforts={efforts} onEffortsChange={setEfforts} /></div>
     {view === "capacity" && <CapacityPlanning planning={planning} calendarId={calendarId} calendarName={calendars.find((calendar) => calendar.id === calendarId)?.display_name ?? ""} mockMode={mockMode} />}
+    {view === "projects" && <ProjectMaster mockMode={mockMode} embeddedView="projects" />}
+    {view === "squads" && <ProjectMaster mockMode={mockMode} embeddedView="squads" />}
     {view === "roadmap" && <>
       {!calendarId && <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Select a compatible Sprint calendar to schedule projects. Active projects are already listed below.</p>}
       <div className="mt-6 grid items-start gap-5 xl:grid-cols-[288px_minmax(0,1fr)]"><section onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const id = event.dataTransfer.getData("text/project-id"); const project = planning.projects.find((item) => item.id === id); if (project?.status === "scheduled") void unschedule(project); }} className="surface bg-[var(--surface-subtle)] p-4"><div className="flex items-start gap-3"><span aria-hidden="true" className="grid size-9 place-items-center rounded-xl bg-white shadow-sm">≡</span><div><h2 className="font-extrabold">Unscheduled backlog</h2><p className="mt-0.5 text-xs text-[var(--muted)]">{backlog.length} active Project Master record{backlog.length === 1 ? "" : "s"}</p></div></div><div className="mt-4 min-h-28 space-y-3">{backlog.map((project) => <article key={project.id} draggable onDragStart={(event) => { event.dataTransfer.setData("text/project-id", project.id); setDraggingId(project.id); }} className="rounded-xl border border-[var(--border)] bg-white p-3 shadow-sm transition-shadow hover:shadow-md"><h3 className="text-sm font-extrabold">{project.name}</h3><p className="mt-1 text-xs font-medium text-[var(--muted)]">{project.totalEffortMd} MD · {project.squadEffort.length} Squad{project.squadEffort.length === 1 ? "" : "s"}</p><button disabled={!calendarId || saving} onClick={() => void schedule(project, 1)} className="mt-3 min-h-9 w-full rounded-lg bg-[var(--ink)] px-2 text-xs font-bold text-white disabled:opacity-40">Schedule in S1</button></article>)}{backlog.length === 0 && <p className="rounded-xl border border-dashed border-[var(--border)] bg-white p-4 text-center text-xs text-[var(--muted)]">All active projects are scheduled.</p>}</div></section>

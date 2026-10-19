@@ -1,6 +1,7 @@
-import { ProjectMaster } from "@/features/resource-capacity/project-master";
-import { isLocalMockDataMode } from "@/lib/development-mode";
+import { redirect } from "next/navigation";
 
-export default function ProjectsPage() {
-  return <ProjectMaster mockMode={isLocalMockDataMode} />;
+export default async function ProjectsPage({ searchParams }: Readonly<{ searchParams: Promise<{ view?: string }> }>) {
+  const legacyView = (await searchParams).view;
+  const view = legacyView === "squads" ? "squads" : legacyView === "effort" ? "estimation" : "projects";
+  redirect(`/planning?view=${view}`);
 }

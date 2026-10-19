@@ -62,7 +62,8 @@ afterEach(cleanup);
 describe("Project Master authentication", () => {
   it("loads Demo Mode without constructing a Supabase client or showing auth UI", async () => {
     render(<ProjectMaster mockMode />);
-    expect(await screen.findByText("Demo Mode — Data saved in this browser")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Project–Squad Effort" })).toBeInTheDocument();
+    expect(screen.queryByText("Demo Mode — Data saved in this browser")).not.toBeInTheDocument();
     expect(mocks.createClient).not.toHaveBeenCalled();
     expect(mocks.getSession).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();

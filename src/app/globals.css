@@ -79,6 +79,16 @@ textarea {
   border-color: #aeb5a9;
 }
 
+.allocation-input {
+  appearance: textfield;
+}
+
+.allocation-input::-webkit-inner-spin-button,
+.allocation-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

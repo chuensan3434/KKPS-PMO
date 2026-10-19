@@ -65,7 +65,7 @@ describe("UnifiedPlanning loading recovery", () => {
 
   it("loads Demo Mode without constructing a Supabase client or checking auth", async () => {
     render(<UnifiedPlanning mockMode />);
-    expect(await screen.findByRole("heading", { name: "Roadmap Planning" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Planning" })).toBeInTheDocument();
     expect(mocks.createClient).not.toHaveBeenCalled();
     expect(mocks.getSession).not.toHaveBeenCalled();
     expect(mocks.onAuthStateChange).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ describe("UnifiedPlanning loading recovery", () => {
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(mocks.scheduleList).toHaveBeenCalledTimes(2));
     expect(mocks.projectList).toHaveBeenCalledOnce();
-    expect(await screen.findByText("Compatible · 26 Sprints")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Annual Sprint Timeline" })).toBeInTheDocument();
   });
 
   it("recovers after a repository request fails and is retried", async () => {
@@ -91,7 +91,7 @@ describe("UnifiedPlanning loading recovery", () => {
     expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(mocks.projectList).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("heading", { name: "Roadmap Planning" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Planning" })).toBeInTheDocument();
   });
 
   it("leaves loading and shows a retry after an unresolved repository request", async () => {
