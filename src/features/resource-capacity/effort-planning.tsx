@@ -95,14 +95,14 @@ export function SquadManagement({ mockMode = false }: Readonly<{ mockMode?: bool
   }
 
   return (
-    <section aria-labelledby="squad-management-heading" className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section aria-labelledby="squad-management-heading" className="surface overflow-hidden">
       <div className="border-b border-slate-200 p-5">
-        <h2 id="squad-management-heading" className="text-xl font-semibold text-slate-950">Squad Management</h2>
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--success)]">Team directory</p><h2 id="squad-management-heading" className="mt-1 text-xl font-extrabold text-[var(--ink)]">Squad Management</h2>
         <p className="mt-1 text-sm text-slate-600">{activeCount} of 15 active squads</p>
         <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={createSquad}>
           <label className="sr-only" htmlFor="new-squad-name">New squad name</label>
-          <input id="new-squad-name" className="min-h-11 flex-1 rounded-lg border border-slate-300 px-3" maxLength={120} placeholder="New squad name" value={name} onChange={(event) => setName(event.target.value)} />
-          <button type="submit" disabled={saving || activeCount >= 15} className="min-h-11 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white disabled:opacity-50">Add squad</button>
+          <input id="new-squad-name" className="control flex-1 px-3" maxLength={120} placeholder="New squad name" value={name} onChange={(event) => setName(event.target.value)} />
+          <button type="submit" disabled={saving || activeCount >= 15} className="min-h-11 rounded-xl bg-[var(--ink)] px-4 text-sm font-bold text-white disabled:opacity-50">Add squad</button>
           <button type="button" className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700" onClick={() => setShowArchived((value) => !value)}>{showArchived ? "View active" : "View archived"}</button>
         </form>
         {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}
@@ -229,12 +229,12 @@ export function EffortPlanning({ mockMode = false }: Readonly<{ mockMode?: boole
     finally { setSavingId(null); }
   }
 
-  if (loading) return <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading effort planning…</p>;
+  if (loading) return <p className="surface p-6 text-sm text-[var(--muted)]">Loading effort planning…</p>;
 
   return (
     <section aria-labelledby="effort-planning-heading" className="space-y-4">
       <div>
-        <h2 id="effort-planning-heading" className="text-xl font-semibold text-slate-950">Project–Squad Effort</h2>
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--success)]">Demand planning</p><h2 id="effort-planning-heading" className="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-[var(--ink)]">Project–Squad Effort</h2>
         <p className="mt-1 text-sm text-slate-600">Expand a project to assign squads and maintain Dev and QA mandays.</p>
       </div>
       {error ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
@@ -249,10 +249,10 @@ export function EffortPlanning({ mockMode = false }: Readonly<{ mockMode?: boole
         const isExpanded = expanded.has(project.id);
         const availableSquads = squads.filter((squad) => squad.active && !active.some((effort) => effort.squad_id === squad.id));
         return (
-          <article key={project.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <button type="button" aria-expanded={isExpanded} aria-controls={`effort-${project.id}`} className="flex min-h-16 w-full flex-col gap-2 p-5 text-left hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between" onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(project.id)) next.delete(project.id); else next.add(project.id); return next; })}>
-              <span className="font-semibold text-slate-950">{isExpanded ? "▾" : "▸"} {project.project_name}</span>
-              <span className="text-sm text-slate-600">Dev {formatMd(totalDev)} · QA {formatMd(totalQa)} · Total {formatMd(totalDev + totalQa)}</span>
+          <article key={project.id} className="surface overflow-hidden">
+            <button type="button" aria-expanded={isExpanded} aria-controls={`effort-${project.id}`} className="flex min-h-16 w-full flex-col gap-2 p-5 text-left hover:bg-[var(--surface-subtle)] sm:flex-row sm:items-center sm:justify-between" onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(project.id)) next.delete(project.id); else next.add(project.id); return next; })}>
+              <span className="flex items-center gap-3 font-extrabold text-[var(--ink)]"><span aria-hidden="true" className={`grid size-7 place-items-center rounded-lg ${isExpanded ? "rotate-90 bg-[var(--accent)]" : "bg-[var(--surface-subtle)]"}`}>›</span>{project.project_name}</span>
+              <span className="rounded-full bg-[var(--surface-subtle)] px-3 py-1.5 text-xs font-bold text-[var(--muted)]">Dev {formatMd(totalDev)} · QA {formatMd(totalQa)} · Total {formatMd(totalDev + totalQa)}</span>
             </button>
             {isExpanded ? (
               <div id={`effort-${project.id}`} className="border-t border-slate-200 p-4 sm:p-5">
@@ -267,10 +267,10 @@ export function EffortPlanning({ mockMode = false }: Readonly<{ mockMode?: boole
                           const draftTotal = Math.max(0, Number(draft.dev_md) || 0) + Math.max(0, Number(draft.qa_md) || 0);
                           return <tr key={effort.id}>
                             <td className="py-3 font-medium text-slate-900">{squad?.display_name ?? "Unknown squad"}</td>
-                            <td className="py-3 pr-3"><input aria-label={`${squad?.display_name} Dev MD`} type="number" min="0" step="0.25" className="min-h-11 w-28 rounded-lg border border-slate-300 px-3 text-right" value={draft.dev_md} onChange={(event) => setDrafts((current) => ({ ...current, [effort.id]: { ...draft, dev_md: event.target.value } }))} /></td>
-                            <td className="py-3 pr-3"><input aria-label={`${squad?.display_name} QA MD`} type="number" min="0" step="0.25" className="min-h-11 w-28 rounded-lg border border-slate-300 px-3 text-right" value={draft.qa_md} onChange={(event) => setDrafts((current) => ({ ...current, [effort.id]: { ...draft, qa_md: event.target.value } }))} /></td>
+                            <td className="py-3 pr-3"><input aria-label={`${squad?.display_name} Dev MD`} type="number" min="0" step="0.25" className="control w-28 px-3 text-right" value={draft.dev_md} onChange={(event) => setDrafts((current) => ({ ...current, [effort.id]: { ...draft, dev_md: event.target.value } }))} /></td>
+                            <td className="py-3 pr-3"><input aria-label={`${squad?.display_name} QA MD`} type="number" min="0" step="0.25" className="control w-28 px-3 text-right" value={draft.qa_md} onChange={(event) => setDrafts((current) => ({ ...current, [effort.id]: { ...draft, qa_md: event.target.value } }))} /></td>
                             <td className="py-3 text-right font-semibold">{formatMd(draftTotal)}</td>
-                            <td className="py-3 text-right"><div className="flex justify-end gap-2"><button type="button" disabled={savingId === effort.id} className="min-h-11 rounded-lg bg-blue-700 px-3 font-semibold text-white disabled:opacity-50" onClick={() => void saveEffort(effort)}>Save</button><button type="button" disabled={savingId === effort.id} className="min-h-11 rounded-lg border border-red-200 px-3 font-semibold text-red-700" onClick={() => void removeAssignment(effort, project)}>Remove</button></div></td>
+                            <td className="py-3 text-right"><div className="flex justify-end gap-2"><button type="button" disabled={savingId === effort.id} className="min-h-10 rounded-xl bg-[var(--ink)] px-3 font-bold text-white disabled:opacity-50" onClick={() => void saveEffort(effort)}>Save</button><button type="button" disabled={savingId === effort.id} className="min-h-10 rounded-xl px-3 font-bold text-red-700 hover:bg-red-50" onClick={() => void removeAssignment(effort, project)}>Remove</button></div></td>
                           </tr>;
                         })}
                       </tbody>
@@ -279,14 +279,14 @@ export function EffortPlanning({ mockMode = false }: Readonly<{ mockMode?: boole
                 )}
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <label className="sr-only" htmlFor={`add-squad-${project.id}`}>Squad to add to {project.project_name}</label>
-                  <select id={`add-squad-${project.id}`} className="min-h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3" value={selectedSquad[project.id] ?? ""} onChange={(event) => setSelectedSquad((current) => ({ ...current, [project.id]: event.target.value }))}>
+                  <select id={`add-squad-${project.id}`} className="control flex-1 bg-white px-3" value={selectedSquad[project.id] ?? ""} onChange={(event) => setSelectedSquad((current) => ({ ...current, [project.id]: event.target.value }))}>
                     <option value="">Select squad…</option>
                     {availableSquads.map((squad) => {
                       const prior = archived.find((effort) => effort.squad_id === squad.id);
                       return <option key={squad.id} value={squad.id}>{squad.display_name}{prior ? ` — restore Dev ${formatMd(prior.dev_md)}, QA ${formatMd(prior.qa_md)}` : ""}</option>;
                     })}
                   </select>
-                  <button type="button" className="min-h-11 rounded-lg border border-blue-700 px-4 text-sm font-semibold text-blue-700" onClick={() => void addOrRestore(project)}>Add squad</button>
+                  <button type="button" className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--ink)]" onClick={() => void addOrRestore(project)}>Add squad</button>
                 </div>
                 {archived.length > 0 ? <p className="mt-3 text-xs text-slate-500">{archived.length} historical assignment{archived.length === 1 ? "" : "s"} retained. Active squads can be restored from the selector.</p> : null}
               </div>

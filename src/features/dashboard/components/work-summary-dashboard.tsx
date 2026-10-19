@@ -29,8 +29,8 @@ function formatPercentage(percentage: number) {
 
 function SummaryList({ title, items }: Readonly<{ title: string; items: SummaryItem[] }>) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+    <section className="surface p-5 sm:p-6">
+      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[var(--ink)]">{title}</h2>
       {items.length ? (
         <ul className="mt-4 divide-y divide-slate-100">
           {items.map((item) => (
@@ -79,12 +79,12 @@ type FilterSelectProps = {
 
 function FilterSelect({ label, value, options, onChange }: Readonly<FilterSelectProps>) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-700">
+    <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[#60675e]">
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+        className="control w-full px-3 text-sm font-medium normal-case tracking-normal"
       >
         <option value="">All {label.toLowerCase()}</option>
         {options.map((option) => {
@@ -164,11 +164,13 @@ export function WorkSummaryDashboard() {
   }
 
   return (
-    <div className="mt-8 space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <div className="space-y-6">
+      <section className="surface overflow-hidden p-0">
+        <div className="h-1 bg-[var(--accent)]" />
+        <div className="p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">actiTIME CSV</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--success)]">Data source</p><h2 className="mt-1 text-xl font-extrabold text-[var(--ink)]">actiTIME CSV</h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               The file is processed only in this browser session and is not uploaded or saved.
             </p>
@@ -188,12 +190,13 @@ export function WorkSummaryDashboard() {
               inputRef.current?.click();
             }}
             disabled={processing}
-            className="min-h-11 shrink-0 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="min-h-11 shrink-0 rounded-xl bg-[var(--ink)] px-5 text-sm font-bold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
           >
             {processing ? "Processing…" : fileName ? "Replace CSV" : "Select CSV"}
           </button>
         </div>
         {error ? <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p> : null}
+        </div>
       </section>
 
       {hasProcessed && entries.length === 0 ? (
@@ -207,7 +210,7 @@ export function WorkSummaryDashboard() {
 
       {entries.length ? (
         <>
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-label="Work summary filters">
+          <section className="surface p-5 sm:p-6" aria-label="Work summary filters">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Filters</h2>
@@ -260,17 +263,17 @@ export function WorkSummaryDashboard() {
             </div>
           </section>
 
-          <nav className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Dashboard views">
+          <nav className="surface flex gap-1 overflow-x-auto p-1" aria-label="Dashboard views">
             {([['summary', 'Work Summary'], ['customer', 'Customer Portfolio'], ['resource', 'Resource Portfolio']] as const).map(([value, label]) => (
-              <button key={value} type="button" onClick={() => setActiveView(value)} aria-current={activeView === value ? "page" : undefined} className={`min-h-11 shrink-0 rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${activeView === value ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>
+              <button key={value} type="button" onClick={() => setActiveView(value)} aria-current={activeView === value ? "page" : undefined} className={`min-h-10 shrink-0 rounded-xl px-4 text-sm font-bold ${activeView === value ? "bg-[var(--accent)] text-[var(--ink)]" : "text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]"}`}>
                 {label}
               </button>
             ))}
           </nav>
 
           {activeView === "summary" ? <>
-          <section className="rounded-xl bg-blue-700 p-6 text-white shadow-sm" aria-label="Total hours">
-            <p className="text-sm font-medium text-blue-100">Total hours</p>
+          <section className="rounded-[var(--radius)] bg-[var(--ink)] p-6 text-white shadow-sm" aria-label="Total hours">
+            <p className="text-sm font-medium text-[#dce1d8]">Total hours</p>
             <p className="mt-2 text-4xl font-bold tracking-tight tabular-nums">{formatHours(summary.totalHours)}</p>
             {skippedRows ? <p className="mt-3 text-sm text-blue-100">{skippedRows} incomplete or invalid rows were skipped.</p> : null}
           </section>

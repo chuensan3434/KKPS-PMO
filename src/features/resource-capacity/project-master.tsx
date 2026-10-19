@@ -179,20 +179,20 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
   if (!mockMode && !session) {
     return (
       <PageContainer title="Projects" description="Sign in with your KKPS-PMO account to manage Project Master data.">
-        <section className="mt-8 max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-950">Sign in</h2>
+        <section className="surface max-w-md p-6">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--success)]">Secure workspace</p><h2 className="mt-1 text-xl font-extrabold text-[var(--ink)]">Sign in</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Accounts are created by an administrator. Public registration is not available here.</p>
           <form className="mt-6 space-y-4" onSubmit={signIn}>
             <label className="block text-sm font-medium text-slate-700">
               Email
-              <input className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-950 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+              <input className="control mt-1 w-full px-3" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Password
-              <input className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-950 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+              <input className="control mt-1 w-full px-3" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
             </label>
             {authError ? <p role="alert" className="text-sm text-red-700">{authError}</p> : null}
-            <button className="min-h-11 w-full rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={authSubmitting}>
+            <button className="min-h-11 w-full rounded-xl bg-[var(--ink)] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40" type="submit" disabled={authSubmitting}>
               {authSubmitting ? "Signing in…" : "Sign in"}
             </button>
           </form>
@@ -202,28 +202,28 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
   }
 
   return (
-    <PageContainer title="Project & Effort Planning" description={mockMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
-      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <PageContainer eyebrow="Portfolio workspace" title="Project & Effort Planning" description={mockMode ? "Maintain local mock projects, squads, and squad-level Dev and QA effort." : "Maintain projects, squads, and squad-level Dev and QA effort in Supabase."}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {mockMode ? <p className="text-sm font-medium text-amber-800">Demo Mode — Data saved in this browser</p> : <><p className="text-sm text-slate-600">Signed in as <span className="font-medium text-slate-900">{session?.user.email}</span></p><button type="button" onClick={signOut} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button></>}
       </div>
 
-      <div role="tablist" aria-label="Project planning sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      <div role="tablist" aria-label="Project planning sections" className="surface mt-6 flex flex-wrap gap-1 p-1">
         {([
           ["effort", "Effort Planning"],
           ["projects", "Project Master"],
           ["squads", "Squad Management"],
         ] as const).map(([value, label]) => (
-          <button key={value} type="button" role="tab" aria-selected={workspaceView === value} onClick={() => setWorkspaceView(value)} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${workspaceView === value ? "bg-blue-700 text-white" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>
+          <button key={value} type="button" role="tab" aria-selected={workspaceView === value} onClick={() => setWorkspaceView(value)} className={`min-h-10 rounded-xl px-4 text-sm font-bold ${workspaceView === value ? "bg-[var(--accent)] text-[var(--ink)]" : "text-[var(--muted)] hover:bg-[var(--surface-subtle)]"}`}>{label}</button>
         ))}
       </div>
 
       {workspaceView === "effort" ? <div className="mt-6"><EffortPlanning mockMode={mockMode} /></div> : null}
       {workspaceView === "squads" ? <div className="mt-6"><SquadManagement mockMode={mockMode} /></div> : null}
       {workspaceView === "projects" ? <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section aria-labelledby="project-list-heading" className="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
+        <section aria-labelledby="project-list-heading" className="surface min-w-0 overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 id="project-list-heading" className="text-xl font-semibold text-slate-950">{showArchived ? "Archived projects" : "Active projects"}</h2>
+              <h2 id="project-list-heading" className="text-xl font-extrabold tracking-[-0.02em] text-[var(--ink)]">{showArchived ? "Archived projects" : "Active projects"}</h2>
               <p className="mt-1 text-sm text-slate-500">{visibleProjects.length} project{visibleProjects.length === 1 ? "" : "s"}</p>
             </div>
             <button type="button" className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setShowArchived((current) => !current)}>
@@ -261,26 +261,26 @@ export function ProjectMaster({ mockMode = isLocalMockDataMode }: Readonly<{ moc
           ) : null}
         </section>
 
-        <section aria-labelledby="project-form-heading" className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 id="project-form-heading" className="text-xl font-semibold text-slate-950">{editingId ? "Edit project" : "Create project"}</h2>
+        <section aria-labelledby="project-form-heading" className="surface h-fit p-5 xl:sticky xl:top-24">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--success)]">Project details</p><h2 id="project-form-heading" className="mt-1 text-xl font-extrabold text-[var(--ink)]">{editingId ? "Edit project" : "Create project"}</h2>
           <form className="mt-5 space-y-4" onSubmit={saveProject}>
             <label className="block text-sm font-medium text-slate-700">
               Project name
-              <input className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-950 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" maxLength={200} required value={form.project_name} onChange={(event) => setForm((current) => ({ ...current, project_name: event.target.value }))} />
+              <input className="control mt-1 w-full px-3" maxLength={200} required value={form.project_name} onChange={(event) => setForm((current) => ({ ...current, project_name: event.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Description
-              <textarea className="mt-1 min-h-28 w-full rounded-lg border border-slate-300 p-3 text-slate-950 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+              <textarea className="control mt-1 min-h-28 w-full p-3" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Status
-              <select className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 capitalize text-slate-950 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as ProjectForm["status"] }))}>
+              <select className="control mt-1 w-full bg-white px-3 capitalize" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as ProjectForm["status"] }))}>
                 {PROJECT_STATUSES.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
               </select>
             </label>
             {formError ? <p role="alert" className="text-sm text-red-700">{formError}</p> : null}
             <div className="flex flex-wrap gap-2">
-              <button className="min-h-11 rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Create project"}</button>
+              <button className="min-h-11 rounded-xl bg-[var(--ink)] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40" type="submit" disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Create project"}</button>
               {editingId ? <button type="button" className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={beginCreate}>Cancel</button> : null}
             </div>
           </form>

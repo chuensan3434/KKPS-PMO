@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { ResourcePortfolio, ResourcePortfolioArea } from "../types";
 import { HOURS_PER_MANDAY } from "../resource-portfolio";
 
-const colors = ["#1d4ed8", "#0f766e", "#7c3aed", "#c2410c", "#be123c", "#0369a1", "#4d7c0f", "#a16207"];
+const colors = ["#20241f", "#d8ed3f", "#64815e", "#e2a84a", "#9f78bd", "#5f8c91", "#91a43c", "#c87563"];
 
 function md(hours: number) {
   return new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(hours / HOURS_PER_MANDAY);
@@ -16,8 +16,8 @@ function PortfolioTable({ title, area }: Readonly<{ title: string; area: Resourc
   const projectPct = area.totalHours ? area.projectHours / area.totalHours * 100 : 0;
   const supportPct = area.totalHours ? area.supportHours / area.totalHours * 100 : 0;
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+    <section className="surface p-5 sm:p-6">
+      <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[var(--ink)]">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">Customer portfolio in mandays</p>
       {area.rows.length ? (
         <div className="mt-5 overflow-x-auto">
@@ -53,8 +53,8 @@ function DepartmentDonut({ portfolio }: Readonly<{ portfolio: ResourcePortfolio 
     return `${colors[index % colors.length]} ${start}% ${progress}%`;
   });
   const style = { background: portfolio.totalHours ? `conic-gradient(${stops.join(",")})` : "#e2e8f0" } as CSSProperties;
-  return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-    <h2 className="text-lg font-semibold text-slate-950">Resource Used by Department</h2>
+  return <section className="surface p-5 sm:p-6">
+    <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[var(--ink)]">Resource Used by Department</h2>
     {portfolio.departments.length ? <div className="mt-5 grid items-center gap-6 sm:grid-cols-[180px_1fr]">
       <div role="img" aria-label="Resource use by department donut chart" className="relative mx-auto size-44 rounded-full" style={style}>
         <div className="absolute inset-9 grid place-items-center rounded-full bg-white text-center"><span><strong className="block text-xl text-slate-950">{md(portfolio.totalHours)}</strong><span className="text-xs text-slate-500">mandays</span></span></div>
@@ -67,14 +67,14 @@ function DepartmentDonut({ portfolio }: Readonly<{ portfolio: ResourcePortfolio 
 }
 
 function ProjectSupportBars({ portfolio }: Readonly<{ portfolio: ResourcePortfolio }>) {
-  return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-    <h2 className="text-lg font-semibold text-slate-950">Project vs Support</h2><p className="mt-1 text-sm text-slate-500">Actual mandays by service area</p>
+  return <section className="surface p-5 sm:p-6">
+    <h2 className="text-lg font-extrabold tracking-[-0.02em] text-[var(--ink)]">Project vs Support</h2><p className="mt-1 text-sm text-slate-500">Actual mandays by service area</p>
     <div className="mt-6 space-y-6">{[["App", portfolio.app], ["Infra", portfolio.infra]].map(([label, value]) => {
       const area = value as ResourcePortfolioArea; const project = area.totalHours ? area.projectHours / area.totalHours * 100 : 0; const support = area.totalHours ? 100 - project : 0;
       return <div key={label as string}><div className="mb-2 flex justify-between text-sm"><span className="font-semibold text-slate-950">{label as string}</span><span className="tabular-nums text-slate-500">{md(area.totalHours)} MD</span></div>
         {area.totalHours ? <div className="flex h-10 overflow-hidden rounded-lg bg-slate-100" aria-label={`${label}: ${pct(project)} project and ${pct(support)} support`}>
-          <div title={`Project · ${md(area.projectHours)} MD · ${pct(project)}`} className="grid min-w-0 place-items-center bg-blue-700 text-xs font-semibold text-white" style={{ width: `${project}%` }}>{project >= 15 ? pct(project) : ""}</div>
-          <div title={`Support · ${md(area.supportHours)} MD · ${pct(support)}`} className="grid min-w-0 place-items-center bg-teal-600 text-xs font-semibold text-white" style={{ width: `${support}%` }}>{support >= 15 ? pct(support) : ""}</div>
+          <div title={`Project · ${md(area.projectHours)} MD · ${pct(project)}`} className="grid min-w-0 place-items-center bg-[var(--ink)] text-xs font-semibold text-white" style={{ width: `${project}%` }}>{project >= 15 ? pct(project) : ""}</div>
+          <div title={`Support · ${md(area.supportHours)} MD · ${pct(support)}`} className="grid min-w-0 place-items-center bg-[var(--accent)] text-xs font-semibold text-[var(--ink)]" style={{ width: `${support}%` }}>{support >= 15 ? pct(support) : ""}</div>
         </div> : <div className="grid h-10 place-items-center rounded-lg bg-slate-100 text-xs text-slate-500">No data</div>}
       </div>;
     })}</div>
@@ -85,9 +85,9 @@ function ProjectSupportBars({ portfolio }: Readonly<{ portfolio: ResourcePortfol
 export function ResourcePortfolioDashboard({ portfolio, periodLabel, estimatedMandays }: Readonly<{ portfolio: ResourcePortfolio; periodLabel: string; estimatedMandays: number | null }>) {
   const actual = portfolio.totalHours / HOURS_PER_MANDAY; const variance = estimatedMandays === null ? null : actual - estimatedMandays;
   return <div className="space-y-6">
-    <div><h2 className="text-2xl font-bold tracking-tight text-slate-950">Technology Service Portfolio</h2><p className="mt-1 text-sm text-slate-500">{periodLabel}</p></div>
+    <div><p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--success)]">Resource intelligence</p><h2 className="mt-1 text-2xl font-extrabold tracking-[-0.03em] text-[var(--ink)]">Technology Service Portfolio</h2><p className="mt-1 text-sm text-slate-500">{periodLabel}</p></div>
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Estimated and actual summary">
-      {[["Estimated Mandays", estimatedMandays === null ? "N/A" : md(estimatedMandays * HOURS_PER_MANDAY)], ["Actual Mandays", md(portfolio.totalHours)], ["Variance Mandays", variance === null ? "N/A" : `${variance > 0 ? "+" : ""}${variance.toFixed(1)}`], ["Variance %", variance === null || !estimatedMandays ? "N/A" : `${variance > 0 ? "+" : ""}${pct(variance / estimatedMandays * 100)}`]].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{value}</p></div>)}
+      {[["Estimated Mandays", estimatedMandays === null ? "N/A" : md(estimatedMandays * HOURS_PER_MANDAY)], ["Actual Mandays", md(portfolio.totalHours)], ["Variance Mandays", variance === null ? "N/A" : `${variance > 0 ? "+" : ""}${variance.toFixed(1)}`], ["Variance %", variance === null || !estimatedMandays ? "N/A" : `${variance > 0 ? "+" : ""}${pct(variance / estimatedMandays * 100)}`]].map(([label, value], index) => <div key={label} className={`surface p-5 ${index === 1 ? "bg-[#f5f9d7]" : ""}`}><p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--muted)]">{label}</p><p className="mt-3 text-2xl font-extrabold tabular-nums text-[var(--ink)]">{value}</p></div>)}
     </section>
     <div className="grid items-start gap-6 xl:grid-cols-2"><DepartmentDonut portfolio={portfolio} /><ProjectSupportBars portfolio={portfolio} /></div>
     <PortfolioTable title="Software Development" area={portfolio.app} />

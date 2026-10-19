@@ -4,7 +4,8 @@ import { WorkSummaryDashboard } from "@/features/dashboard/components/work-summa
 export default function DashboardPage() {
   return (
     <PageContainer
-      title="Dashboard"
+      eyebrow="Portfolio intelligence"
+      title="Overview"
       description="Upload an actiTIME CSV to understand working hours by role, person, and project."
     >
       <WorkSummaryDashboard />
