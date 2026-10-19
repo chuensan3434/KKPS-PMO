@@ -55,6 +55,32 @@ test("a newly created Project appears once in the Roadmap backlog", async ({ pag
   await expect(page.getByText("Unified New Project", { exact: true })).toHaveCount(1);
 });
 
+test("edits project-first effort estimates and preserves canonical demand data in Demo Mode", async ({ page }) => {
+  await page.getByRole("button", { name: "Effort Estimation" }).click();
+  await expect(page.getByRole("heading", { name: "Effort Estimation" })).toBeVisible();
+  await page.getByLabel("Search projects").fill("crm");
+  await expect(page.getByRole("row", { name: /CRM Enhancement/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Digital Onboarding/ })).toHaveCount(0);
+  await page.getByLabel("Search projects").fill("");
+  await page.getByRole("button", { name: "Not Estimated", exact: true }).click();
+  await expect(page.getByText("3 projects")).toBeVisible();
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  const projectRow = page.getByRole("row", { name: /CRM Enhancement/ });
+  await projectRow.getByRole("button", { name: "Expand" }).click();
+  await page.getByLabel("Squad to add to CRM Enhancement").selectOption({ label: "Squad Alpha" });
+  await page.getByRole("button", { name: "+ Add Squad" }).first().click();
+  await page.getByLabel("CRM Enhancement Squad Alpha Dev MD").fill("12.5");
+  await page.getByLabel("CRM Enhancement Squad Alpha QA MD").fill("4.5");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("row", { name: /^▾ CRM Enhancement/ })).toContainText("17");
+  await page.reload();
+  await page.getByRole("button", { name: "Effort Estimation" }).click();
+  await page.getByRole("row", { name: /^▸ CRM Enhancement/ }).getByRole("button", { name: "Expand" }).click();
+  await expect(page.getByLabel("CRM Enhancement Squad Alpha Dev MD")).toHaveValue("12.5");
+  await page.getByRole("button", { name: "Roadmap" }).click();
+  await expect(page.getByText("CRM Enhancement", { exact: true }).locator("..")).toContainText("17 MD");
+});
+
 test("member capacity is the only active source and Capacity Timeline stays in Roadmap", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toBeVisible();
   await expect(page.getByText("Not Configured", { exact: true }).first()).toBeVisible();

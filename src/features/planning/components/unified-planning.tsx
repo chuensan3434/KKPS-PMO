@@ -7,13 +7,10 @@ import type { Project, ProjectRoadmapSchedule, ProjectSquadEffort, Sprint, Sprin
 import { createProjectRepository, createProjectRoadmapScheduleRepository, createProjectSquadEffortRepository, createSquadRepository, createSprintRepository } from "../../resource-capacity/repositories";
 import { loadSelectedCalendarId, saveSelectedCalendarId } from "../calendar-selection-storage";
 import { validateSharedSprintCalendar } from "../capacity-periods";
-import { defaultEstimationState } from "../estimation-data";
-import { loadEstimationState, saveEstimationState } from "../estimation-storage";
-import { loadPlanningState } from "../planning-storage";
 import { scheduleProject, setProjectEndSprint, setProjectStartSprint } from "../roadmap-actions";
 import { formatSprintRange } from "../planning-utils";
 import { getSprintDuration, moveProjectSchedule, packProjectsIntoLanes, resizeProjectSchedule } from "../timeline-utils";
-import type { EstimationState, PlanningProject } from "../types";
+import type { PlanningProject } from "../types";
 import { buildUnifiedPlanningState } from "../unified-planning";
 import { CapacityPlanning } from "./capacity-planning";
 import { EffortEstimation } from "./effort-estimation";
@@ -69,8 +66,6 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [dropSprint, setDropSprint] = useState<number | null>(null);
   const timelineBodyRef = useRef<HTMLDivElement>(null);
-  const [legacyPlanning] = useState(() => typeof window === "undefined" ? { year: 2027, sprintOneStart: "2027-01-04", squads: [], projects: [] } : loadPlanningState());
-  const [legacyEstimation, setLegacyEstimation] = useState<EstimationState>(() => typeof window === "undefined" ? defaultEstimationState : loadEstimationState(legacyPlanning.projects));
 
   useEffect(() => {
     if (mockMode) return;
@@ -162,8 +157,6 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
   function sprintFromPointer(clientX: number) { const rect = timelineBodyRef.current?.getBoundingClientRect(); return rect ? Math.max(1, Math.min(sprints.length, Math.floor((clientX - rect.left) / sprintWidth) + 1)) : null; }
   async function dropOnSprint(event: React.DragEvent, sprint: number) { event.preventDefault(); event.stopPropagation(); const resizeId = event.dataTransfer.getData("text/resize-project-id"); const moveId = event.dataTransfer.getData("text/project-id"); const project = planning.projects.find((item) => item.id === (resizeId || moveId)); if (!project) return; const range = resizeId ? resizeProjectSchedule(project, sprint, sprints.length) : project.status === "scheduled" ? moveProjectSchedule(project, sprint, sprints.length) : scheduleProject(project, sprint, sprints.length); await persistRange(project, range.scheduledStartSprint!, range.scheduledEndSprint!); setDraggingId(null); setResizingId(null); setDropSprint(null); }
 
-  function changeLegacyEstimation(next: EstimationState) { setLegacyEstimation(next); saveEstimationState(next); }
-
   if (loading && projects.length === 0 && !error) return <div className="px-4 py-12 text-sm text-slate-500">Loading unified planning workspace…</div>;
   if (!mockMode && accessReady && !session) return <div className="px-4 py-12"><h1 className="text-2xl font-bold">Supabase session required</h1><p role="alert" className="mt-2 text-slate-600">{error || "Sign in from Projects before opening unified Planning."}</p><button onClick={() => { setError(""); setAccessReady(false); setLoading(true); setAuthAttempt((current) => current + 1); }} className="mt-4 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700">Retry authentication</button></div>;
 
@@ -173,7 +166,7 @@ export function UnifiedPlanning({ mockMode }: Readonly<{ mockMode: boolean }>) {
     <section className="mt-6 flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mr-auto"><h2 className="font-semibold text-slate-950">Planning calendar</h2><p className="mt-1 text-xs text-slate-500">The selected calendar is shared by Roadmap and Squad Capacity Planner.</p></div><label className="text-sm font-medium text-slate-700">Sprint calendar<select aria-label="Sprint calendar" value={calendarId} onChange={(event) => void selectCalendar(event.target.value)} className="mt-1 block h-10 min-w-56 rounded-lg border border-slate-300 px-3"><option value="">Select a calendar</option>{calendars.map((calendar) => <option key={calendar.id} value={calendar.id}>{calendar.display_name} · {calendar.baseline_start_date}</option>)}</select></label>{calendarId && sprints.length > 0 && <p className="text-sm font-semibold text-emerald-700">Compatible · {sprints.length} Sprints</p>}</section>
     {view === "roadmap" && <SprintCalendarSetup repository={sprintRepository} schedules={schedules.filter((item) => item.archived_at === null).length} capacityPeriods={0} onCreated={(calendar, createdSprints) => { setCalendars((value) => [...value, calendar]); setCalendarId(calendar.id); setSprints(createdSprints); setSchedules([]); }} />}
     <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">{(["roadmap", "estimation", "capacity"] as const).map((tab) => <button key={tab} onClick={() => setView(tab)} aria-pressed={view === tab} className={`rounded-md px-4 py-2 text-sm font-semibold ${view === tab ? "bg-blue-700 text-white" : "text-slate-600"}`}>{tab === "roadmap" ? "Roadmap" : tab === "estimation" ? "Effort Estimation" : "Squad Capacity Planner"}</button>)}</div>
-    {view === "estimation" && <div className="mt-6"><p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Legacy estimation is kept separate and does not contribute to unified Roadmap demand.</p><EffortEstimation projects={legacyPlanning.projects} squads={legacyPlanning.squads} estimation={legacyEstimation} selectedProjectId={null} onSelectProject={() => undefined} onChange={changeLegacyEstimation} /></div>}
+    <div hidden={view !== "estimation"} className="mt-6"><EffortEstimation client={client} mockMode={mockMode} projects={projects} squads={squads} efforts={efforts} onEffortsChange={setEfforts} /></div>
     {view === "capacity" && <CapacityPlanning planning={planning} calendarId={calendarId} mockMode={mockMode} />}
     {view === "roadmap" && <>
       {!calendarId && <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Select a compatible Sprint calendar to schedule projects. Active projects are already listed below.</p>}
