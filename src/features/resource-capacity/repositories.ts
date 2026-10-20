@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { isLocalMockDataMode } from "../../lib/development-mode";
+import { createMockCapacityRepository, createMockEffortRepository, createMockProjectRepository, createMockScheduleRepository, createMockSprintRepository, createMockSquadRepository } from "./mock-repositories";
 import {
   personCreateSchema,
   personSchema,
   personUpdateSchema,
   projectCreateSchema,
+  projectRoadmapScheduleCreateSchema,
+  projectRoadmapScheduleSchema,
+  projectRoadmapScheduleUpdateSchema,
   projectSchema,
   projectSquadEffortCreateSchema,
   projectSquadEffortSchema,
@@ -13,6 +18,9 @@ import {
   squadAliasCreateSchema,
   squadAliasSchema,
   squadCreateSchema,
+  squadCapacityPeriodCreateSchema,
+  squadCapacityPeriodSchema,
+  squadCapacityPeriodUpdateSchema,
   squadMembershipCreateSchema,
   squadMembershipSchema,
   squadMembershipUpdateSchema,
@@ -27,6 +35,7 @@ import {
 } from "./domain";
 
 type RepositoryClient = SupabaseClient;
+type MockableRepositoryClient = SupabaseClient | null;
 
 export class ResourceRepositoryError extends Error {
   constructor(operation: string, detail: string) {
@@ -61,7 +70,9 @@ function databaseError(operation: string, error: { message: string; code?: strin
   if (error) throw new ResourceRepositoryError(operation, `${error.message}${error.code ? ` (${error.code})` : ""}`);
 }
 
-export function createSquadRepository(client: RepositoryClient) {
+export function createSquadRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockSquadRepository();
+  if (!client) throw new ResourceRepositoryError("Create squad repository", "Supabase client is required outside Demo Mode.");
   return {
     async list() {
       const operation = "List squads";
@@ -169,7 +180,9 @@ export function createMembershipRepository(client: RepositoryClient) {
   };
 }
 
-export function createSprintRepository(client: RepositoryClient) {
+export function createSprintRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockSprintRepository();
+  if (!client) throw new ResourceRepositoryError("Create sprint repository", "Supabase client is required outside Demo Mode.");
   return {
     async listCalendars() {
       const operation = "List sprint calendars";
@@ -214,7 +227,9 @@ export function createSprintRepository(client: RepositoryClient) {
   };
 }
 
-export function createProjectRepository(client: RepositoryClient) {
+export function createProjectRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockProjectRepository();
+  if (!client) throw new ResourceRepositoryError("Create project repository", "Supabase client is required outside Demo Mode.");
   return {
     async list() {
       const operation = "List projects";
@@ -245,7 +260,9 @@ export function createProjectRepository(client: RepositoryClient) {
   };
 }
 
-export function createProjectSquadEffortRepository(client: RepositoryClient) {
+export function createProjectSquadEffortRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockEffortRepository();
+  if (!client) throw new ResourceRepositoryError("Create effort repository", "Supabase client is required outside Demo Mode.");
   return {
     async list(projectId?: string) {
       const operation = "List project squad efforts";
@@ -280,6 +297,74 @@ export function createProjectSquadEffortRepository(client: RepositoryClient) {
       const { data, error } = await client.from("project_squad_efforts").update({ archived_at: null }).eq("id", validateId(operation, id)).select().single();
       databaseError(operation, error);
       return parseRow(operation, projectSquadEffortSchema, data);
+    },
+  };
+}
+
+export function createSquadCapacityPeriodRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockCapacityRepository();
+  if (!client) throw new ResourceRepositoryError("Create capacity repository", "Supabase client is required outside Demo Mode.");
+  return {
+    async list(calendarId?: string) {
+      const operation = "List capacity periods";
+      let query = client.from("squad_capacity_periods").select("*").order("start_sprint");
+      if (calendarId) query = query.eq("calendar_id", validateId(operation, calendarId));
+      const { data, error } = await query;
+      databaseError(operation, error);
+      return parseRows(operation, squadCapacityPeriodSchema, data);
+    },
+    async create(input: unknown) {
+      const operation = "Create capacity period";
+      const values = validateInput(operation, squadCapacityPeriodCreateSchema, input);
+      const { data, error } = await client.from("squad_capacity_periods").insert(values).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadCapacityPeriodSchema, data);
+    },
+    async update(id: string, input: unknown) {
+      const operation = "Update capacity period";
+      const values = validateInput(operation, squadCapacityPeriodUpdateSchema, input);
+      const { data, error } = await client.from("squad_capacity_periods").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadCapacityPeriodSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive capacity period";
+      const { data, error } = await client.from("squad_capacity_periods").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, squadCapacityPeriodSchema, data);
+    },
+  };
+}
+
+export function createProjectRoadmapScheduleRepository(client: MockableRepositoryClient, useMock = isLocalMockDataMode) {
+  if (useMock) return createMockScheduleRepository();
+  if (!client) throw new ResourceRepositoryError("Create Roadmap repository", "Supabase client is required outside Demo Mode.");
+  return {
+    async list(calendarId: string) {
+      const operation = "List project Roadmap schedules";
+      const { data, error } = await client.from("project_roadmap_schedules").select("*").eq("calendar_id", validateId(operation, calendarId)).order("created_at");
+      databaseError(operation, error);
+      return parseRows(operation, projectRoadmapScheduleSchema, data);
+    },
+    async create(input: unknown) {
+      const operation = "Create project Roadmap schedule";
+      const values = validateInput(operation, projectRoadmapScheduleCreateSchema, input);
+      const { data, error } = await client.from("project_roadmap_schedules").insert(values).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectRoadmapScheduleSchema, data);
+    },
+    async update(id: string, input: unknown) {
+      const operation = "Update project Roadmap schedule";
+      const values = validateInput(operation, projectRoadmapScheduleUpdateSchema, input);
+      const { data, error } = await client.from("project_roadmap_schedules").update(values).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectRoadmapScheduleSchema, data);
+    },
+    async archive(id: string) {
+      const operation = "Archive project Roadmap schedule";
+      const { data, error } = await client.from("project_roadmap_schedules").update({ archived_at: new Date().toISOString() }).eq("id", validateId(operation, id)).select().single();
+      databaseError(operation, error);
+      return parseRow(operation, projectRoadmapScheduleSchema, data);
     },
   };
 }

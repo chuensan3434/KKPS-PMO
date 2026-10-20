@@ -69,12 +69,12 @@ export const sprintCalendarSchema = z.object({
   code: nonBlank(80),
   display_name: nonBlank(160),
   baseline_start_date: isoDate,
-  cadence_days: z.literal(14),
+  cadence_days: z.number().int().min(7).max(28),
   active: z.boolean(),
   created_at: timestamp,
   updated_at: timestamp,
 });
-export const sprintCalendarCreateSchema = sprintCalendarSchema.omit({ id: true, created_at: true, updated_at: true, cadence_days: true });
+export const sprintCalendarCreateSchema = sprintCalendarSchema.omit({ id: true, created_at: true, updated_at: true }).extend({ cadence_days: z.number().int().min(7).max(28).default(14) });
 export const sprintCalendarUpdateSchema = sprintCalendarCreateSchema.partial().refine((value) => Object.keys(value).length > 0, "Provide at least one calendar change.");
 
 export const sprintSchema = z.object({
@@ -85,6 +85,7 @@ export const sprintSchema = z.object({
   start_date: isoDate,
   display_end_date: isoDate,
   coverage_end_date: isoDate,
+  holiday_adjustment_days: z.number().int().nonnegative().default(0),
   created_at: timestamp,
   updated_at: timestamp,
 });
@@ -96,6 +97,9 @@ export const projectSchema = z.object({
   id: z.string().uuid(),
   project_name: nonBlank(200),
   description: z.string().nullable(),
+  business_unit: z.string().trim().min(1).max(120).nullable().optional(),
+  owner_name: z.string().trim().min(1).max(160).nullable().optional(),
+  target_date: isoDate.nullable().optional(),
   status: projectStatusSchema,
   metadata: z.record(z.string(), z.unknown()),
   archived_at: timestamp.nullable(),
@@ -124,6 +128,58 @@ export const projectSquadEffortCreateSchema = projectSquadEffortSchema.pick({
 export const projectSquadEffortUpdateSchema = projectSquadEffortSchema.pick({ dev_md: true, qa_md: true }).partial()
   .refine((value) => Object.keys(value).length > 0, "Provide at least one effort change.");
 
+export const capacitySourceSchema = z.enum(["manual", "employee-derived", "override"]);
+export const squadCapacityPeriodSchema = z.object({
+  id: z.string().uuid(),
+  squad_id: z.string().uuid(),
+  calendar_id: z.string().uuid(),
+  start_sprint: z.number().int().positive(),
+  end_sprint: z.number().int().positive(),
+  capacity_md: z.coerce.number().finite().nonnegative(),
+  source: capacitySourceSchema,
+  archived_at: timestamp.nullable(),
+  created_at: timestamp,
+  updated_at: timestamp,
+}).refine((value) => value.end_sprint >= value.start_sprint, {
+  message: "End Sprint must be the same as or after Start Sprint.",
+  path: ["end_sprint"],
+});
+export const squadCapacityPeriodCreateSchema = squadCapacityPeriodSchema.pick({
+  squad_id: true,
+  calendar_id: true,
+  start_sprint: true,
+  end_sprint: true,
+  capacity_md: true,
+  source: true,
+}).refine((value) => value.end_sprint >= value.start_sprint, {
+  message: "End Sprint must be the same as or after Start Sprint.",
+  path: ["end_sprint"],
+});
+export const squadCapacityPeriodUpdateSchema = squadCapacityPeriodSchema.pick({
+  start_sprint: true,
+  end_sprint: true,
+  capacity_md: true,
+  source: true,
+}).partial().refine((value) => Object.keys(value).length > 0, "Provide at least one capacity change.");
+
+export const projectRoadmapScheduleSchema = z.object({
+  id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  calendar_id: z.string().uuid(),
+  start_sprint: z.number().int().positive(),
+  end_sprint: z.number().int().positive(),
+  archived_at: timestamp.nullable(),
+  created_at: timestamp,
+  updated_at: timestamp,
+}).refine((value) => value.end_sprint >= value.start_sprint, {
+  message: "End Sprint must be the same as or after Start Sprint.",
+  path: ["end_sprint"],
+});
+export const projectRoadmapScheduleCreateSchema = projectRoadmapScheduleSchema.pick({ project_id: true, calendar_id: true, start_sprint: true, end_sprint: true })
+  .refine((value) => value.end_sprint >= value.start_sprint, { message: "End Sprint must be the same as or after Start Sprint.", path: ["end_sprint"] });
+export const projectRoadmapScheduleUpdateSchema = projectRoadmapScheduleSchema.pick({ start_sprint: true, end_sprint: true }).partial()
+  .refine((value) => Object.keys(value).length > 0, "Provide at least one schedule change.");
+
 export type Squad = z.infer<typeof squadSchema>;
 export type SquadCreate = z.input<typeof squadCreateSchema>;
 export type SquadAlias = z.infer<typeof squadAliasSchema>;
@@ -140,6 +196,9 @@ export type Project = z.infer<typeof projectSchema>;
 export type ProjectCreate = z.input<typeof projectCreateSchema>;
 export type ProjectSquadEffort = z.infer<typeof projectSquadEffortSchema>;
 export type ProjectSquadEffortCreate = z.input<typeof projectSquadEffortCreateSchema>;
+export type SquadCapacityPeriod = z.infer<typeof squadCapacityPeriodSchema>;
+export type SquadCapacityPeriodCreate = z.input<typeof squadCapacityPeriodCreateSchema>;
+export type ProjectRoadmapSchedule = z.infer<typeof projectRoadmapScheduleSchema>;
 
 export const MANDAY_HOURS = 8 as const;
 export const CAPACITY_CATEGORIES = ["DEV", "QA", "SUPPORT", "SA", "OTHER"] as const;

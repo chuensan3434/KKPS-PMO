@@ -3,6 +3,7 @@ import { PageContainer } from "@/components/layout/page-container";
 export default function SettingsPage() {
   return (
     <PageContainer
+      eyebrow="Workspace controls"
       title="Settings"
       description="Application settings will be implemented in a later phase."
     />

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(27);
 
 select has_table('public', 'squads', 'squads exists');
 select has_table('public', 'people', 'people exists');
@@ -52,11 +52,25 @@ select throws_ok(
     from public.sprint_calendars where code = 'test-2027'$$,
   '23505', null, 'sprint sequence is unique per calendar'
 );
-select throws_ok(
+select lives_ok(
   $$insert into public.sprints (calendar_id, sprint_code, sequence_number, start_date, display_end_date, coverage_end_date)
     select id, '2027-S2', 2, date '2027-01-18', date '2027-01-30', date '2027-01-31'
     from public.sprint_calendars where code = 'test-2027'$$,
-  '23514', null, 'display end must follow the existing second-Friday convention'
+  'adjusted display end is valid for a versioned Sprint calendar'
+);
+select throws_ok(
+  $$insert into public.sprints (calendar_id, sprint_code, sequence_number, start_date, display_end_date, coverage_end_date)
+    select id, '2027-OVERLAP', 3, date '2027-01-31', date '2027-02-11', date '2027-02-13'
+    from public.sprint_calendars where code = 'test-2027'$$,
+  '23514', null, 'overlapping Sprint dates are rejected within a calendar'
+);
+insert into public.sprints (calendar_id, sprint_code, sequence_number, start_date, display_end_date, coverage_end_date)
+select id, '2027-S3', 3, date '2027-02-01', date '2027-02-11', date '2027-02-13'
+from public.sprint_calendars where code = 'test-2027';
+select throws_ok(
+  $$update public.sprints set start_date = date '2027-02-14', display_end_date = date '2027-02-24', coverage_end_date = date '2027-02-26'
+    where sprint_code = '2027-S2'$$,
+  '23514', null, 'Sprint dates must remain chronological by sequence'
 );
 
 select throws_ok(

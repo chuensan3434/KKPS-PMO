@@ -1,60 +1,189 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  await page.goto("/planning");
+const projectId = "30000000-0000-4000-8000-000000000001";
+
+async function resetDemo(page: Page, route = "/projects") {
+  await page.goto(route);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Roadmap Planning" })).toBeVisible();
+}
+
+async function selectCalendar(page: Page) {
+  await page.getByLabel("Sprint calendar").selectOption({ label: "Local Mock 2027 · 2027-01-04" });
+  await expect(page.getByText("S26", { exact: true }).first()).toBeVisible();
+}
+
+async function openCapacityPlanner(page: Page) {
+  await resetDemo(page, "/planning");
+  await selectCalendar(page);
+  await page.getByRole("tab", { name: "Squad Capacity" }).click();
+  await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
+}
+
+async function expectCapacitySectionOrder(page: Page) {
+  const members = page.getByText("Manage Squad Members", { exact: true });
+  const workTypes = page.getByText("Manage Work Types", { exact: true });
+  const matrix = page.getByRole("heading", { name: "Annual Allocation Matrix" });
+  const trend = page.getByRole("heading", { name: "Workload Mix Trend" });
+  await expect(members).toBeVisible();
+  await expect(workTypes).toBeVisible();
+  await expect(matrix).toBeVisible();
+  await expect(trend).toBeVisible();
+  const membersBox = await members.boundingBox(), matrixBox = await matrix.boundingBox(), trendBox = await trend.boundingBox();
+  expect(membersBox).not.toBeNull();
+  expect(matrixBox).not.toBeNull();
+  expect(trendBox).not.toBeNull();
+  expect(membersBox!.y).toBeLessThan(matrixBox!.y);
+  expect(matrixBox!.y).toBeLessThan(trendBox!.y);
+}
+
+test("uses Projects as the single intake and effort workspace", async ({ page }) => {
+  await resetDemo(page);
+  await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByText("Projects", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Effort Estimation/i })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Expand CRM Enhancement" }).click();
+  await page.getByLabel("Squad to add").selectOption({ label: "Squad Alpha" });
+  await page.getByRole("button", { name: "Add Squad" }).click();
+  await page.getByLabel("CRM Enhancement Dev MD").fill("12.5");
+  await page.getByLabel("CRM Enhancement QA MD").fill("4.5");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText(/Total 17 MD/)).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Expand CRM Enhancement" }).click();
+  await expect(page.getByLabel("CRM Enhancement Dev MD")).toHaveValue("12.5");
 });
 
-test("schedules, manually edits, and unschedules without changing estimated MD", async ({ page }) => {
-  const backlogProject = page.locator('[draggable="true"]', { hasText: "CRM Enhancement" }).first();
-  const sprintOne = page.getByText("S1", { exact: true }).first().locator("..");
-  await backlogProject.dragTo(sprintOne);
-  const details = page.getByRole("heading", { name: "CRM Enhancement" }).last().locator("..", { hasText: "Selected project impact" });
-  await expect(page.getByText(/CRM Enhancement · 120 MD · 2 Sprints/)).toBeVisible();
+test("manages 205 projects with compact table controls", async ({ page }) => {
+  await resetDemo(page);
+  await expect(page.getByText("3 active projects")).toBeVisible();
+  await page.evaluate(() => {
+    const key = "kkps-pmo:local-mock-data:v1";
+    const store = JSON.parse(localStorage.getItem(key) ?? "null");
+    const created = "2027-01-01T00:00:00.000Z";
+    for (let index = 1; index <= 202; index += 1) {
+      store.projects.push({
+        id: `50000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+        project_name: `Scale Project ${String(index).padStart(3, "0")}`,
+        description: `Scale test project ${index}`,
+        business_unit: index % 2 === 0 ? "Retail" : "Operations",
+        owner_name: `Owner ${index}`,
+        target_date: `2027-${String((index % 12) + 1).padStart(2, "0")}-15`,
+        status: index % 3 === 0 ? "completed" : "active",
+        metadata: {}, archived_at: null, created_at: created, updated_at: created,
+      });
+    }
+    localStorage.setItem(key, JSON.stringify(store));
+  });
+  await page.reload();
+  await expect(page.getByText("205 active projects")).toBeVisible();
+  await expect(page.getByText("Showing 1–25 of 205")).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByText("Page 2 of 9")).toBeVisible();
+  await page.getByLabel("Projects per page").selectOption("50");
+  await expect(page.getByText("Showing 1–50 of 205")).toBeVisible();
 
-  const start = page.locator("label", { hasText: "Start sprint" }).locator("select");
-  const end = page.locator("label", { hasText: "End sprint" }).locator("select");
-  await start.selectOption("3");
-  await end.selectOption("5");
-  await expect(page.getByText(/120 MD · S3–S5 · 3 Sprints/)).toBeVisible();
+  await page.getByLabel("Search projects").fill("Scale Project 200");
+  await expect(page.getByRole("button", { name: "Expand Scale Project 200" })).toBeVisible();
+  await page.getByLabel("Search projects").fill("");
+  await page.getByLabel("Filter by business unit").selectOption("Retail");
+  await page.getByLabel("Filter by status").selectOption("completed");
+  await expect(page.getByText(/of 33$/)).toBeVisible();
+  await page.getByLabel("Filter by status").selectOption("");
+  await page.getByLabel("Filter by business unit").selectOption("");
 
-  await page.getByRole("button", { name: "Return to backlog" }).click();
-  await expect(page.getByRole("button", { name: "Schedule in S1" }).first()).toBeVisible();
-  await expect(details).not.toBeVisible();
+  await page.getByRole("button", { name: /Target Date/ }).click();
+  await expect(page.getByRole("columnheader", { name: /Target Date/ })).toHaveAttribute("aria-sort", "ascending");
+  const expand = page.getByRole("button", { name: "Expand CRM Enhancement" });
+  await expand.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Multi-Squad Effort Estimation" })).toBeVisible();
+  await page.screenshot({ path: "test-results/projects-table-desktop.png", fullPage: true });
+
+  await page.getByRole("button", { name: "New Project" }).click();
+  await page.getByLabel("Project name").fill("New Portfolio Item");
+  await page.getByRole("textbox", { name: "Business unit", exact: true }).fill("Digital");
+  await page.getByRole("button", { name: "Save Project" }).click();
+  await expect(page.getByRole("button", { name: "Collapse New Portfolio Item" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).last().click();
+  await page.getByRole("textbox", { name: "Project name", exact: true }).fill("Updated Portfolio Item");
+  await page.getByRole("button", { name: "Save Project" }).click();
+  await expect(page.getByRole("button", { name: "Collapse Updated Portfolio Item" })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Archive", exact: true }).last().click();
+  await expect(page.getByText("Updated Portfolio Item", { exact: true })).toHaveCount(0);
 });
 
-test("starting a resize does not live-preview or persist a changed end sprint", async ({ page }) => {
+test("uses the Sprint Roadmap as the primary planning experience", async ({ page }) => {
+  await resetDemo(page, `/planning?project=${projectId}`);
+  await expect(page.getByRole("heading", { name: "Quarterly Roadmap" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save Quarter Plan" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Annual Sprint Timeline" })).toBeVisible();
+  await selectCalendar(page);
+  await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toBeVisible();
   await page.getByRole("button", { name: "Schedule in S1" }).first().click();
-  const resizeHandle = page.getByRole("separator", { name: "Resize CRM Enhancement end sprint" });
-  const before = await page.evaluate(() => localStorage.getItem("kkps-pmo:roadmap-planning:v1"));
-
-  await resizeHandle.dispatchEvent("dragstart", { dataTransfer: await page.evaluateHandle(() => new DataTransfer()) });
-  await resizeHandle.dispatchEvent("dragend");
-
-  await expect(page.getByText(/120 MD · S1–S2 · 2 Sprints/)).toBeVisible();
-  const after = await page.evaluate(() => localStorage.getItem("kkps-pmo:roadmap-planning:v1"));
-  expect(after).toBe(before);
+  await expect(page.getByRole("button", { name: "CRM Enhancement, S1 to S2" })).toBeVisible();
 });
 
-test("moves, extends, and shrinks a scheduled bar on whole-sprint boundaries", async ({ page }) => {
-  await page.getByRole("button", { name: "Schedule in S1" }).first().click();
-  const sprint = (number: number) => page.getByText(`S${number}`, { exact: true }).first().locator("..");
-
-  await page.getByRole("button", { name: "CRM Enhancement, S1 to S2" }).dragTo(sprint(5));
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S6" })).toBeVisible();
-
-  const dropResizeAt = async (number: number) => sprint(number).evaluate((target, projectId) => {
-    const dataTransfer = new DataTransfer();
-    dataTransfer.setData("text/resize-project-id", projectId);
-    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }));
-  }, "crm");
-
-  await dropResizeAt(8);
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S8" })).toBeVisible();
-
-  await dropResizeAt(5);
-  await expect(page.getByRole("button", { name: "CRM Enhancement, S5 to S5" })).toBeVisible();
-  await expect(page.getByText(/120 MD · 1 Sprint/)).toBeVisible();
+test("does not show a Sprint schedule editor for an unscheduled deep link", async ({ page }) => {
+  await resetDemo(page, `/planning?project=${projectId}`);
+  await expect(page.getByText("S–S", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Return to backlog" })).toHaveCount(0);
 });
+
+test("preserves capacity planning beneath Planning", async ({ page }) => {
+  await openCapacityPlanner(page);
+  await expectCapacitySectionOrder(page);
+  await expect(page.getByLabel("Scrollable annual allocation matrix")).toBeVisible();
+
+  await page.getByText("Manage Squad Members", { exact: true }).click();
+  await page.getByLabel("New member name").fill("Capacity Tester");
+  await page.getByLabel("New member name").locator("xpath=following-sibling::button").click();
+  await expect(page.getByRole("listitem").getByText("Capacity Tester", { exact: true })).toBeVisible();
+  await page.getByText("Manage Work Types", { exact: true }).click();
+  await page.getByLabel("New work type").fill("Security");
+  await page.getByLabel("New work type").locator("xpath=following-sibling::button").click();
+  await expect(page.getByRole("listitem").getByText("Security", { exact: true })).toBeVisible();
+
+  await page.getByLabel("Row employee").selectOption({ label: "Capacity Tester" });
+  await page.getByLabel("Row work type").selectOption({ label: "Dev" });
+  await page.getByRole("button", { name: "+ Add Row" }).click();
+  const allocation = page.getByRole("spinbutton", { name: "Capacity Tester Dev S1", exact: true });
+  await allocation.fill("40");
+  await expect(page.getByText("✓ All changes saved")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("spinbutton", { name: "Capacity Tester Dev S1", exact: true })).toHaveValue("40");
+
+  await page.getByRole("button", { name: /^Select Sprint 1,/ }).click();
+  await expect(page.getByRole("button", { name: "S1", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("spinbutton", { name: "Capacity Tester Dev S1", exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-\[#f5f9d7\]/);
+});
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 }]) {
+  test(`orders capacity sections responsively at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await openCapacityPlanner(page);
+    await expectCapacitySectionOrder(page);
+    const membersBox = await page.getByText("Manage Squad Members", { exact: true }).boundingBox();
+    const workTypesBox = await page.getByText("Manage Work Types", { exact: true }).boundingBox();
+    expect(membersBox).not.toBeNull();
+    expect(workTypesBox).not.toBeNull();
+    if (viewport.width >= 1024) expect(Math.abs(membersBox!.y - workTypesBox!.y)).toBeLessThan(4);
+    else expect(workTypesBox!.y).toBeGreaterThan(membersBox!.y + membersBox!.height);
+  });
+}
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1024, height: 768 }]) {
+  test(`has no page-level horizontal overflow at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await resetDemo(page);
+    await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (viewport.width === 390) {
+      await page.screenshot({ path: "test-results/projects-table-mobile.png", fullPage: true });
+      await page.getByRole("button", { name: "Open navigation menu" }).click();
+      await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByText("Planning", { exact: true })).toBeVisible();
+    }
+  });
+}

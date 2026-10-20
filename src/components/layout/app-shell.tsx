@@ -1,16 +1,11 @@
 import { Navigation } from "./navigation";
+import { DataModeBanner } from "./data-mode-banner";
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="min-h-screen bg-[var(--canvas)]">
       <Navigation />
-
-      <div className="min-w-0">
-        <header className="hidden h-16 items-center border-b border-slate-200 bg-white px-8 lg:flex">
-          <p className="text-sm font-medium text-slate-500">Project Management Office</p>
-        </header>
-        <main>{children}</main>
-      </div>
+      <main className="min-w-0"><DataModeBanner />{children}</main>
     </div>
   );
 }
