@@ -29,15 +29,11 @@ test("uses Projects as the single intake and effort workspace", async ({ page })
   await expect(page.getByLabel("CRM Enhancement Dev MD")).toHaveValue("12.5");
 });
 
-test("keeps quarter intent separate from confirmed Sprint demand", async ({ page }) => {
+test("uses the Sprint Roadmap as the primary planning experience", async ({ page }) => {
   await resetDemo(page, `/planning?project=${projectId}`);
-  await expect(page.getByRole("heading", { name: "Quarterly Roadmap" })).toBeVisible();
-  await page.getByLabel("Quarter plan start").selectOption("1");
-  await page.getByLabel("Quarter plan end").selectOption("2");
-  await page.getByRole("button", { name: "Save Quarter Plan" }).click();
-  await expect(page.getByRole("button", { name: /Q1–Q2 Quarter-level/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toHaveCount(0);
-
+  await expect(page.getByRole("heading", { name: "Quarterly Roadmap" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save Quarter Plan" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Annual Sprint Timeline" })).toBeVisible();
   await selectCalendar(page);
   await expect(page.getByRole("heading", { name: "Capacity Timeline" })).toBeVisible();
   await page.getByRole("button", { name: "Schedule in S1" }).first().click();

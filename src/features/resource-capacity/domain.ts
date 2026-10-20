@@ -180,21 +180,6 @@ export const projectRoadmapScheduleCreateSchema = projectRoadmapScheduleSchema.p
 export const projectRoadmapScheduleUpdateSchema = projectRoadmapScheduleSchema.pick({ start_sprint: true, end_sprint: true }).partial()
   .refine((value) => Object.keys(value).length > 0, "Provide at least one schedule change.");
 
-export const projectQuarterPlanSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  planned_year: z.number().int().min(2000).max(2100),
-  start_quarter: z.number().int().min(1).max(4),
-  end_quarter: z.number().int().min(1).max(4),
-  archived_at: timestamp.nullable(),
-  created_at: timestamp,
-  updated_at: timestamp,
-}).refine((value) => value.end_quarter >= value.start_quarter, { message: "End Quarter cannot be before Start Quarter.", path: ["end_quarter"] });
-export const projectQuarterPlanCreateSchema = projectQuarterPlanSchema.pick({ project_id: true, planned_year: true, start_quarter: true, end_quarter: true })
-  .refine((value) => value.end_quarter >= value.start_quarter, { message: "End Quarter cannot be before Start Quarter.", path: ["end_quarter"] });
-export const projectQuarterPlanUpdateSchema = projectQuarterPlanSchema.pick({ start_quarter: true, end_quarter: true }).partial()
-  .refine((value) => Object.keys(value).length > 0, "Provide at least one quarter-plan change.");
-
 export type Squad = z.infer<typeof squadSchema>;
 export type SquadCreate = z.input<typeof squadCreateSchema>;
 export type SquadAlias = z.infer<typeof squadAliasSchema>;
@@ -214,7 +199,6 @@ export type ProjectSquadEffortCreate = z.input<typeof projectSquadEffortCreateSc
 export type SquadCapacityPeriod = z.infer<typeof squadCapacityPeriodSchema>;
 export type SquadCapacityPeriodCreate = z.input<typeof squadCapacityPeriodCreateSchema>;
 export type ProjectRoadmapSchedule = z.infer<typeof projectRoadmapScheduleSchema>;
-export type ProjectQuarterPlan = z.infer<typeof projectQuarterPlanSchema>;
 
 export const MANDAY_HOURS = 8 as const;
 export const CAPACITY_CATEGORIES = ["DEV", "QA", "SUPPORT", "SA", "OTHER"] as const;

@@ -9,11 +9,10 @@ const existing: Project = { id: "10000000-0000-4000-8000-000000000001", project_
 describe("previewProjectImport", () => {
   it("groups multiple Squad rows and preserves explicit zero effort", () => {
     const preview = previewProjectImport([
-      { "Project Name": "CRM", Squad: "Alpha", "Dev MD": 0, "QA MD": 5, "Planned Year": 2027, "Start Quarter": "Q1", "End Quarter": "Q2" },
+      { "Project Name": "CRM", Squad: "Alpha", "Dev MD": 0, "QA MD": 5 },
     ], [], [squad]);
     expect(preview.issues).toEqual([]);
     expect(preview.projects[0].efforts[0]).toMatchObject({ dev_md: 0, qa_md: 5 });
-    expect(preview.pendingQuarterProjects).toBe(1);
   });
 
   it("skips existing projects and reports row-level errors", () => {

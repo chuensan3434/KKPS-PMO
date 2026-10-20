@@ -10,7 +10,7 @@ describe("buildPortfolioSummary", () => {
     const summary = buildPortfolioSummary(projects, [
       { id: "20000000-0000-4000-8000-000000000001", project_id: projects[1].id, squad_id: "30000000-0000-4000-8000-000000000001", dev_md: 0, qa_md: 0, archived_at: null, created_at: now, updated_at: now },
       { id: "20000000-0000-4000-8000-000000000002", project_id: projects[2].id, squad_id: "30000000-0000-4000-8000-000000000001", dev_md: 10, qa_md: 5, archived_at: null, created_at: now, updated_at: now },
-    ], [{ id: "40000000-0000-4000-8000-000000000001", project_id: projects[2].id, planned_year: 2027, start_quarter: 1, end_quarter: 2, archived_at: null, created_at: now, updated_at: now }], [], 2);
+    ], [{ id: "40000000-0000-4000-8000-000000000001", project_id: projects[2].id, calendar_id: "50000000-0000-4000-8000-000000000001", start_sprint: 1, end_sprint: 2, archived_at: null, created_at: now, updated_at: now }], 2);
     expect(summary).toEqual({ projects: 3, needsEstimation: 1, readyForPlanning: 1, planned: 1, capacityExceptions: 2 });
   });
 });
