@@ -13,6 +13,30 @@ async function selectCalendar(page: Page) {
   await expect(page.getByText("S26", { exact: true }).first()).toBeVisible();
 }
 
+async function openCapacityPlanner(page: Page) {
+  await resetDemo(page, "/planning");
+  await selectCalendar(page);
+  await page.getByRole("tab", { name: "Squad Capacity" }).click();
+  await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
+}
+
+async function expectCapacitySectionOrder(page: Page) {
+  const members = page.getByText("Manage Squad Members", { exact: true });
+  const workTypes = page.getByText("Manage Work Types", { exact: true });
+  const matrix = page.getByRole("heading", { name: "Annual Allocation Matrix" });
+  const trend = page.getByRole("heading", { name: "Workload Mix Trend" });
+  await expect(members).toBeVisible();
+  await expect(workTypes).toBeVisible();
+  await expect(matrix).toBeVisible();
+  await expect(trend).toBeVisible();
+  const membersBox = await members.boundingBox(), matrixBox = await matrix.boundingBox(), trendBox = await trend.boundingBox();
+  expect(membersBox).not.toBeNull();
+  expect(matrixBox).not.toBeNull();
+  expect(trendBox).not.toBeNull();
+  expect(membersBox!.y).toBeLessThan(matrixBox!.y);
+  expect(matrixBox!.y).toBeLessThan(trendBox!.y);
+}
+
 test("uses Projects as the single intake and effort workspace", async ({ page }) => {
   await resetDemo(page);
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
@@ -109,13 +133,46 @@ test("does not show a Sprint schedule editor for an unscheduled deep link", asyn
 });
 
 test("preserves capacity planning beneath Planning", async ({ page }) => {
-  await resetDemo(page, "/planning");
-  await selectCalendar(page);
-  await page.getByRole("tab", { name: "Squad Capacity" }).click();
-  await expect(page.getByRole("heading", { name: "Squad Capacity Planner" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Annual Allocation Matrix" })).toBeVisible();
+  await openCapacityPlanner(page);
+  await expectCapacitySectionOrder(page);
   await expect(page.getByLabel("Scrollable annual allocation matrix")).toBeVisible();
+
+  await page.getByText("Manage Squad Members", { exact: true }).click();
+  await page.getByLabel("New member name").fill("Capacity Tester");
+  await page.getByLabel("New member name").locator("xpath=following-sibling::button").click();
+  await expect(page.getByRole("listitem").getByText("Capacity Tester", { exact: true })).toBeVisible();
+  await page.getByText("Manage Work Types", { exact: true }).click();
+  await page.getByLabel("New work type").fill("Security");
+  await page.getByLabel("New work type").locator("xpath=following-sibling::button").click();
+  await expect(page.getByRole("listitem").getByText("Security", { exact: true })).toBeVisible();
+
+  await page.getByLabel("Row employee").selectOption({ label: "Capacity Tester" });
+  await page.getByLabel("Row work type").selectOption({ label: "Dev" });
+  await page.getByRole("button", { name: "+ Add Row" }).click();
+  const allocation = page.getByRole("spinbutton", { name: "Capacity Tester Dev S1", exact: true });
+  await allocation.fill("40");
+  await expect(page.getByText("✓ All changes saved")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("spinbutton", { name: "Capacity Tester Dev S1", exact: true })).toHaveValue("40");
+
+  await page.getByRole("button", { name: /^Select Sprint 1,/ }).click();
+  await expect(page.getByRole("button", { name: "S1", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("spinbutton", { name: "Capacity Tester Dev S1", exact: true }).locator("xpath=ancestor::td")).toHaveClass(/bg-\[#f5f9d7\]/);
 });
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 }]) {
+  test(`orders capacity sections responsively at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await openCapacityPlanner(page);
+    await expectCapacitySectionOrder(page);
+    const membersBox = await page.getByText("Manage Squad Members", { exact: true }).boundingBox();
+    const workTypesBox = await page.getByText("Manage Work Types", { exact: true }).boundingBox();
+    expect(membersBox).not.toBeNull();
+    expect(workTypesBox).not.toBeNull();
+    if (viewport.width >= 1024) expect(Math.abs(membersBox!.y - workTypesBox!.y)).toBeLessThan(4);
+    else expect(workTypesBox!.y).toBeGreaterThan(membersBox!.y + membersBox!.height);
+  });
+}
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 1024, height: 768 }]) {
   test(`has no page-level horizontal overflow at ${viewport.width}px`, async ({ page }) => {
